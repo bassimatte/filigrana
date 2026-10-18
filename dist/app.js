@@ -9,6 +9,22 @@ const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContex
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
 let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,photo=true,paths=true,lastTime=0,totalTime=0,loadId=0,maskLayer=null,downloadURL=null,finished=false,lastSpeaker=null;
 const conversation=new Conversation();
+let palette={paper:'#f4f1e9',green:'#527153',photoPath:'#527153'};
+const photoColours=['#a94c2c','#276b86','#79518d'];
+function paintPaths(){
+  if(!maskLayer||!graph)return;
+  const mctx=maskLayer.getContext('2d');mctx.clearRect(0,0,maskLayer.width,maskLayer.height);
+  mctx.strokeStyle=photo?palette.photoPath:palette.green;mctx.lineWidth=1.1;
+  for(const e of graph.edges){mctx.beginPath();e.points.forEach((p,i)=>i?mctx.lineTo(p.x,p.y):mctx.moveTo(p.x,p.y));mctx.stroke();}
+}
+function refreshPalette(){
+  const styles=getComputedStyle(document.documentElement),value=key=>styles.getPropertyValue(key).trim();
+  palette={paper:value('--paper'),green:value('--green'),photoPath:value('--photo-path')};
+  for(const t of travellers)t.colour=value(`--voice-${t.id+1}`);
+  paintPaths();draw();
+}
+document.addEventListener('filigrana-theme-change',refreshPalette);
+
 const settings=()=>({speed:+$('speed').value/100,tuning:+$('tuning').value,q:+$('q').value,volume:+$('volume').value/100,mode:$('branch').value,interaction:$('interaction').value,gap:+$('response-gap').value,duration:+$('duration').value,room:+$('room').value/100,delayTime:+$('delay-time').value/1000,delayMix:+$('delay-mix').value/100,delayFeedback:+$('delay-feedback').value/100,delayEnabled:$('delay-enabled').checked});
 function updateEffects(){const s=settings();audio.setRoom(s.room);audio.setDelay(s.delayTime,s.delayMix,s.delayFeedback,s.delayEnabled);}
 const active=()=>travellers.filter(t=>t.enabled&&t.walker);
@@ -63,7 +79,7 @@ function syncTraveller(t){
 }
 function mountTravellers(){
   for(const t of travellers){
-    const card=document.createElement('section');card.className='traveller';card.id=`traveller-${t.id}`;card.style.setProperty('--traveller',t.colour);card.setAttribute('aria-label',`Traveller ${t.id+1}`);
+    const card=document.createElement('section');card.className='traveller';card.id=`traveller-${t.id}`;card.style.setProperty('--traveller',`var(--voice-${t.id+1})`);card.setAttribute('aria-label',`Traveller ${t.id+1}`);
     card.innerHTML=`<div class="traveller-heading"><span><i></i>Traveller ${t.id+1}</span><label class="enable-label"><input id="enabled-${t.id}" type="checkbox" checked aria-label="Enable traveller ${t.id+1}">On</label></div>
       <button class="place-button" id="place-${t.id}" aria-pressed="${t.id===0}" aria-label="Set start for traveller ${t.id+1}">⌖ Set start</button>
       <div class="traveller-fields"><label for="instrument-${t.id}">Instrument</label><select id="instrument-${t.id}" aria-label="Instrument for traveller ${t.id+1}">${Object.entries(INSTRUMENTS).map(([key,s])=>`<option value="${key}">${s.label}</option>`).join('')}</select>
@@ -112,8 +128,7 @@ async function analyse(){
     const mask=thin(inkMask(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height,+$('sensitivity').value),canvas.width,canvas.height);
     graph=graphFromSkeleton(mask,canvas.width,canvas.height);totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.setGraph(graph);}
     maskLayer=document.createElement('canvas');maskLayer.width=canvas.width;maskLayer.height=canvas.height;
-    const mctx=maskLayer.getContext('2d');mctx.strokeStyle='#648969';mctx.lineWidth=1.1;
-    for(const e of graph.edges){mctx.beginPath();e.points.forEach((p,i)=>i?mctx.lineTo(p.x,p.y):mctx.moveTo(p.x,p.y));mctx.stroke();}
+    paintPaths();
     $('junction-count').textContent=`${graph.junctions.length} junctions`;
     if(graph.edges.length){
       defaultStarts(graph).forEach((start,i)=>travellers[i].place(start.edgeId,start.from,start.distance));
@@ -136,19 +151,19 @@ function locateClick(event){
 }
 function draw(){
   if(!image)return;
-  ctx.fillStyle='#f5f3ec';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle=photo?'#f4f1e9':palette.paper;ctx.fillRect(0,0,canvas.width,canvas.height);
   if(photo){ctx.globalAlpha=.82;ctx.drawImage(image,0,0,canvas.width,canvas.height);ctx.globalAlpha=1;}
   if(paths&&maskLayer){ctx.globalAlpha=photo?.48:.8;ctx.drawImage(maskLayer,0,0);ctx.globalAlpha=1;}
-  if(paths&&graph){ctx.fillStyle='#648969';for(const n of graph.junctions){ctx.beginPath();ctx.arc(n.x,n.y,1.8,0,Math.PI*2);ctx.fill();}}
+  if(paths&&graph){ctx.fillStyle=photo?palette.photoPath:palette.green;for(const n of graph.junctions){ctx.beginPath();ctx.arc(n.x,n.y,1.8,0,Math.PI*2);ctx.fill();}}
   if(!graph)return;
   for(const t of travellers){
     if(!t.walker){$(`traveller-note-${t.id}`).textContent='No path';continue;}
-    const e=graph.edges[t.walker.edge];ctx.globalAlpha=t.enabled?1:.25;
-    ctx.strokeStyle=t.colour;ctx.lineWidth=t.id===selected?2.7:2;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();e.points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();
-    if(t.enabled)for(let i=0;i<t.trail.length;i+=2){ctx.globalAlpha=(i/t.trail.length)*.5;ctx.fillStyle=t.colour;ctx.beginPath();ctx.arc(t.trail[i].x,t.trail[i].y,1.5,0,Math.PI*2);ctx.fill();}
-    const p=t.position();ctx.globalAlpha=t.enabled?.15:.06;ctx.fillStyle=t.colour;ctx.beginPath();ctx.arc(p.x,p.y,10+t.pulse*5,0,Math.PI*2);ctx.fill();ctx.globalAlpha=t.enabled?1:.35;
-    ctx.strokeStyle='#f5f3ec';ctx.fillStyle=t.colour;ctx.lineWidth=1.7;ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);ctx.fill();ctx.stroke();
-    ctx.font='bold 8px sans-serif';ctx.textAlign='center';ctx.fillStyle=t.colour;ctx.fillText(String(t.id+1),p.x,p.y-12);ctx.globalAlpha=1;
+    const e=graph.edges[t.walker.edge],colour=photo?photoColours[t.id]:t.colour;ctx.globalAlpha=t.enabled?1:.25;
+    ctx.strokeStyle=colour;ctx.lineWidth=t.id===selected?2.7:2;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();e.points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();
+    if(t.enabled)for(let i=0;i<t.trail.length;i+=2){ctx.globalAlpha=(i/t.trail.length)*.5;ctx.fillStyle=colour;ctx.beginPath();ctx.arc(t.trail[i].x,t.trail[i].y,1.5,0,Math.PI*2);ctx.fill();}
+    const p=t.position();ctx.globalAlpha=t.enabled?.15:.06;ctx.fillStyle=colour;ctx.beginPath();ctx.arc(p.x,p.y,10+t.pulse*5,0,Math.PI*2);ctx.fill();ctx.globalAlpha=t.enabled?1:.35;
+    ctx.strokeStyle=photo?'#f4f1e9':palette.paper;ctx.fillStyle=colour;ctx.lineWidth=1.7;ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.font='bold 8px sans-serif';ctx.textAlign='center';ctx.fillStyle=colour;ctx.fillText(String(t.id+1),p.x,p.y-12);ctx.globalAlpha=1;
     const hz=t.heardPitch??pitch(t,e);
     $(`traveller-note-${t.id}`).textContent=`${t.enabled?'':'Off · '}${t.scale==='free'?`${hz.toFixed(1)} Hz`:noteName(hz)} · ${isNoteVoice(t.instrument)?`${t.strikes} ${t.strikes===1?'note':'notes'}`:'resonance'}`;
   }
@@ -169,7 +184,7 @@ function frame(now){
   const s=settings(),form=pieceEnvelope(totalTime,s.duration),status=finished?'The piece has ended.':playing&&!form.acceptNotes?'Letting the last notes fade…':s.interaction==='conversation'?(lastSpeaker===null?'Listening for the first phrase.':`Traveller ${lastSpeaker+1} is speaking; the others leave room.`):'Independent voices · each follows its own rhythm.';
   if($('performance-status').textContent!==status)$('performance-status').textContent=status;
   $('elapsed').textContent=`${String(Math.floor(totalTime/60)).padStart(2,'0')}:${String(Math.floor(totalTime%60)).padStart(2,'0')}`;
-  sx.clearRect(0,0,scope.width,scope.height);sx.strokeStyle='#648969';sx.lineWidth=1.5;sx.beginPath();
+  sx.clearRect(0,0,scope.width,scope.height);sx.strokeStyle=palette.green;sx.lineWidth=1.5;sx.beginPath();
   if(audio.analyser&&playing){const data=new Uint8Array(audio.analyser.fftSize);audio.analyser.getByteTimeDomainData(data);for(let i=0;i<data.length;i++){const x=i/(data.length-1)*scope.width,y=scope.height/2+(data[i]-128)/128*scope.height*.46;i?sx.lineTo(x,y):sx.moveTo(x,y);}}
   else{sx.moveTo(0,scope.height/2);sx.lineTo(scope.width,scope.height/2);}sx.stroke();requestAnimationFrame(frame);
 }
@@ -180,7 +195,7 @@ $('play').onclick=async()=>{
 };
 function restart(){audio.silence();conversation.reset();lastSpeaker=null;totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.restart();}if(playing){audio.setVolume(settings().volume*pieceEnvelope(0,settings().duration).gain);for(const t of active())soundEdge(t);answer();}uiState();draw();}
 $('reset').onclick=()=>{restart();message('All travellers returned to their own starting points and journey seed.');};
-$('original').onclick=()=>{photo=!photo;$('original').setAttribute('aria-pressed',photo);draw();};
+$('original').onclick=()=>{photo=!photo;$('original').setAttribute('aria-pressed',photo);paintPaths();draw();};
 $('network').onclick=()=>{paths=!paths;$('network').setAttribute('aria-pressed',paths);draw();};
 canvas.addEventListener('click',locateClick);canvas.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();$('play').click();}});
 function updateLabels(){
@@ -251,4 +266,4 @@ $('record').onclick=()=>{
   catch(e){message(e.message);}
 };
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing){stop();message('Paused while this tab was hidden. Press Listen to continue.');}});
-mountTravellers();updateLabels();requestAnimationFrame(frame);loadImage('drawing.jpg','Your drawing · IMG_1790');
+mountTravellers();refreshPalette();updateLabels();requestAnimationFrame(frame);loadImage('drawing.jpg','Your drawing · IMG_1790');

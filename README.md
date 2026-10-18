@@ -63,3 +63,7 @@ Open the app, press **Listen**, or choose **Try a calm trio**. Upload a clear dr
 The internal composition identifier remains `line-resonator` so saved prototype compositions remain compatible. New downloads use the Filigrana name.
 
 Code and demonstration artwork are published for viewing; no separate reuse license has been granted. Uploaded artwork remains its owner's work.
+
+## Appearance
+
+Choose **Light**, **Dark**, or **Auto** in the header. Auto follows the device appearance; an explicit choice is remembered in this browser. The controls, waveform, and paths view share the selected palette. The original photograph keeps its natural colors. Changing appearance preserves playback, origins, and composition settings.

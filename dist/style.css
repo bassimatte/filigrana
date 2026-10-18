@@ -90,3 +90,120 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   .traveller-fields select { font-size: 11px; }
   .readout #frequency { font-size: 60px; }
 }
+
+/* Listening first: the score stays central; detail appears when invited. */
+[hidden] { display: none !important; }
+body { padding-bottom: 96px; }
+main { grid-template-columns: minmax(0,1fr) 280px; gap: 40px; padding-top: 30px; }
+.intro { align-items: center; gap: 20px; margin-bottom: 25px; }
+h1 { font-size: clamp(34px,3.4vw,48px); line-height: 1.08; }
+.intro .eyebrow { margin-bottom: 10px; }
+.intro-copy { margin: 0; flex-shrink: 0; font-size: 11px; }
+.voice-bar { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; margin-bottom: 14px; }
+.voice-chip { min-width: 0; border: 1px solid var(--line); border-top: 2px solid var(--traveller); border-radius: 10px; background: var(--card); overflow: hidden; }
+.voice-button { display: flex; align-items: center; gap: 8px; width: 100%; border: 0; background: transparent; padding: 12px 10px 9px; text-align: left; color: var(--ink); }
+.voice-button:hover, .voice-button[aria-expanded=true] { background: var(--selected); }
+.voice-button>span:nth-child(2) { min-width: 0; flex: 1; }
+.voice-button strong { display: block; font-size: 11px; font-weight: 500; }
+.voice-button span span { display: block; color: var(--muted); font-size: 10px; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.voice-number { display: grid; place-items: center; width: 22px; height: 22px; flex-shrink: 0; border: 1px solid var(--traveller); color: var(--traveller); border-radius: 50%; font-size: 10px; }
+.voice-button.muted .voice-number { opacity: .4; }
+.voice-mute { display: block; margin: 0 10px 9px auto; min-width: 44px; background: transparent; color: var(--traveller); border: 0; padding: 4px 6px; font-size: 10px; border-radius: 5px; }
+.voice-mute[aria-pressed=true] { color: var(--muted); background: var(--inactive); }
+#travellers.voice-settings { display: block; }
+.voice-settings .traveller { display: block; margin-bottom: 16px; }
+.traveller-heading { display: flex; gap: 12px; }
+.close-voice { border: 0; background: transparent; font-size: 10px; color: var(--muted); margin-left: auto; }
+.voice-settings .traveller label.enable-label { margin-left: 8px; }
+.voice-settings .place-button { width: auto; min-width: 135px; display: inline-block; margin: 14px 0; }
+.voice-settings .traveller-fields { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px 12px; }
+.voice-settings .traveller-fields label { grid-row: 1; margin: 0; }
+.voice-settings .traveller-fields select { grid-row: 2; }
+.voice-settings .traveller-note { font-size: 10px; }
+.voice-settings .traveller-expression[open] { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; }
+.voice-settings .traveller-expression summary { grid-column: 1/-1; }
+.voice-settings .traveller-expression input { grid-column: 2; align-self: center; margin: 12px 0; }
+.voice-settings .traveller-expression label { margin: 12px 0; }
+.canvas-wrap { height: clamp(420px,64vh,760px); min-height: 420px; }
+#drawing { touch-action: none; }
+.drawing-toolbar { font-size: 11px; border-top: 0; }
+.drawing-toolbar label.upload { color: var(--ink); padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--field); }
+.drawing-caption { display: flex; justify-content: space-between; gap: 20px; margin-top: 10px; font-size: 10px; line-height: 1.7; color: var(--muted); }
+.drawing-caption p { margin: 0; }
+.drawing-caption #performance-status { min-height: 0; max-width: 210px; text-align: right; color: var(--green); }
+#message { min-height: 0; font-size: 10px; margin-bottom: 0; }
+.listening-panel { padding-left: 26px; }
+.listening-panel>.eyebrow { margin: 4px 0 23px; }
+.moods h2 { margin-bottom: 15px; font-size: 25px; }
+.mood-options { display: grid; gap: 7px; }
+.mood-options button { padding: 12px 14px; text-align: left; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 9px; }
+.mood-options button[aria-pressed=true] { border-color: var(--green); background: var(--selected); box-shadow: inset 3px 0 var(--green); }
+.mood-options button:hover { border-color: var(--green); }
+.mood-options strong { display: block; font: 21px 'Instrument Serif',Georgia,serif; font-weight: 400; }
+.mood-options span { display: block; font-size: 10px; color: var(--muted); margin-top: 4px; }
+#mood-description { min-height: 38px; }
+.simple-controls { border-bottom: 0; }
+.simple-controls h2 { font-size: 25px; }
+.advanced { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 18px 0; }
+.advanced>summary { font-size: 12px; }
+.advanced .controls h2 { font-size: 23px; }
+.advanced details { padding: 18px 0; border-bottom: 1px solid var(--line); }
+.advanced details:last-child { border-bottom: 0; padding-bottom: 0; }
+.advanced .extraction { padding-bottom: 0; border-bottom: 0; }
+.score-toolbar { margin-top: 15px; padding: 0; border: 0; flex-direction: column; align-items: flex-start; }
+.score-toolbar>span { display: none; }
+.score-toolbar>div { flex-wrap: wrap; }
+.advanced .readout { margin-top: 18px; padding: 14px; }
+.advanced #frequency { font-size: 44px; }
+.privacy-note { color: var(--muted); font-size: 10px; line-height: 1.8; margin-top: 20px; }
+.transport { position: fixed; z-index: 10; bottom: 0; left: 0; right: 0; margin: 0; padding: 16px max(5vw,calc((100vw - 1296px)/2)); background: var(--paper); border-top: 1px solid var(--line); border-bottom: 0; box-shadow: 0 -8px 28px var(--shadow); gap: 12px; }
+.transport button { min-height: 43px; }
+.transport-status { flex-direction: row; align-items: center; gap: 16px; }
+.transport-status #state { font-size: 9px; }
+footer { padding-top: 18px; padding-bottom: 18px; }
+@media(max-width:1000px) {
+  main { grid-template-columns: minmax(0,1fr) 245px; gap: 24px; }
+  .listening-panel { padding-left: 22px; }
+  .intro-copy { display: none; }
+  .voice-button { padding: 10px 7px 8px; gap: 6px; }
+  .voice-number { width: 18px; height: 18px; }
+  .voice-button>span:last-child { display: none; }
+  .drawing-caption { display: block; }
+  .drawing-caption #performance-status { text-align: left; margin-top: 7px; max-width: none; }
+  .drawing-toolbar>div { gap: 10px; }
+  .drawing-toolbar label.upload { max-width: 126px; }
+}
+@media(max-width:700px) {
+  body { padding-bottom: 88px; }
+  main { display: block; padding: 24px 5vw; }
+  h1 { font-size: 39px; max-width: 310px; }
+  .intro { margin-bottom: 20px; }
+  .voice-bar { gap: 6px; }
+  .voice-button { padding: 10px 7px 6px; gap: 6px; }
+  .voice-button strong { font-size: 10px; }
+  .voice-button span span { font-size: 9px; }
+  .voice-mute { margin: 0 5px 6px auto; }
+  .voice-settings .traveller { display: block; padding: 13px; }
+  .voice-settings .traveller-fields { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+  .voice-settings .traveller-fields select { font-size: 10px; padding: 8px 4px; }
+  .voice-settings .traveller-fields label { font-size: 10px; }
+  .canvas-wrap { height: 58svh; min-height: 350px; max-height: 630px; }
+  #drawing { height: calc(100% - 50px); max-width: calc(100% - 32px); }
+  .drawing-toolbar { flex-wrap: wrap; gap: 10px; }
+  .drawing-toolbar>span { max-width: 100%; width: 100%; }
+  .drawing-toolbar>div { width: 100%; justify-content: flex-end; gap: 18px; }
+  .drawing-toolbar label.upload { margin-right: auto; order: -1; max-width: none; }
+  .canvas-note { left: 10px; bottom: 8px; font-size: 9px; padding: 5px 7px; }
+  .listening-panel { border-left: 0; padding: 25px 0 0; margin-top: 25px; border-top: 1px solid var(--line); }
+  .listening-panel>.eyebrow { display: none; }
+  .mood-options { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+  .mood-options button { padding: 10px; }
+  .mood-options strong { font-size: 22px; }
+  .mood-options span { font-size: 9px; line-height: 1.6; }
+  #mood-description { min-height: 0; }
+  .transport { padding: 12px 5vw max(12px,env(safe-area-inset-bottom)); gap: 7px; }
+  .transport button { font-size: 11px; padding: 10px; min-width: 0; }
+  .transport button.play { min-width: 100px; }
+  .transport-status { flex-direction: column; gap: 3px; font-size: 10px; }
+  .transport-status #state { display: none; }
+}

@@ -1,0 +1,40 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Instrument rendering checks</title>
+<body><h1>Instrument rendering checks</h1><p id="status">Rendering…</p><ul id="results"></ul>
+<script type="module">
+import {Resonator} from '../dist/audio.js';
+import {INSTRUMENTS} from '../dist/instruments.js';
+const results=document.getElementById('results'),status=document.getElementById('status');
+const rms=(data,start,end)=>{let sum=0;for(let i=start;i<end;i++)sum+=data[i]**2;return Math.sqrt(sum/Math.max(1,end-start));};
+let failures=0,checks=0;
+function report(name,pass,detail){checks++;const li=document.createElement('li');li.textContent=`${pass?'PASS':'FAIL'} · ${name} · ${detail}`;results.append(li);if(!pass)failures++;}
+try{
+  for(const [key,profile]of Object.entries(INSTRUMENTS)){
+    if(profile.continuous)continue;
+    const c=new OfflineAudioContext(2,22050*5,22050),a=new Resonator();await a.init(c);a.setRoom(.32);a.setActiveCount(1);a.setVolume(.35);a.setDelay(.65,.18,.28,true);a.strike(220,42,0,.2,0,key);
+    const output=await c.startRendering(),data=output.getChannelData(0);let peak=0,finite=true;for(const sample of data){if(!Number.isFinite(sample))finite=false;peak=Math.max(peak,Math.abs(sample));}
+    const level=rms(data,0,data.length);report(profile.label,finite&&peak<.99&&level>.0002,`RMS ${level.toFixed(5)}, peak ${peak.toFixed(5)}`);
+  }
+  // Test the actual feedback path with a single impulse, no reverb and no notes.
+  for(const enabled of [true,false]){
+    const rate=22050,c=new OfflineAudioContext(2,rate*3,rate),a=new Resonator();await a.init(c);a.wet.gain.value=0;a.setRoom(0);a.setActiveCount(1);a.setVolume(.5);a.setDelay(.25,.4,.45,enabled);
+    const b=c.createBuffer(1,1,rate);b.getChannelData(0)[0]=.7;const source=c.createBufferSource();source.buffer=b;source.connect(a.effectInput);source.start(1);
+    const data=(await c.startRendering()).getChannelData(0),first=rms(data,Math.floor(rate*1.23),Math.floor(rate*1.28)),second=rms(data,Math.floor(rate*1.48),Math.floor(rate*1.53));
+    report(enabled?'Delay produces fading repeats':'Delay bypass removes repeats',enabled?first>1e-5&&second>1e-6&&second<first:first<1e-7&&second<1e-7,`first ${first.toExponential(2)}, second ${second.toExponential(2)}`);
+  }
+  for(const volume of [1,0]){
+    const rate=22050,c=new OfflineAudioContext(2,rate*2,rate),a=new Resonator();await a.init(c);a.wet.gain.value=0;a.setRoom(0);a.delayWet.gain.value=0;a.setDelay(.65,0,0,false);a.setActiveCount(1);a.setVolume(.5);a.setTraveller(0,volume,-1);a.strike(220,42,0,0,0,'piano');
+    const output=await c.startRendering(),left=rms(output.getChannelData(0),0,output.length),right=rms(output.getChannelData(1),0,output.length);
+    report(volume?'Traveller stereo reaches the left channel':'Zero traveller volume is silent from the first note',volume?left>.001&&right<1e-7:left<1e-7&&right<1e-7,`left ${left.toExponential(2)}, right ${right.toExponential(2)}`);
+  }
+  class ScheduledContext extends OfflineAudioContext{renderTime=0;get currentTime(){return this.renderTime;}}
+  for(const highRegister of [false,true]){
+    const rate=22050,c=new ScheduledContext(2,rate*9,rate),a=new Resonator();await a.init(c);a.setActiveCount(3);a.setVolume(1);a.setRoom(.7);a.setDelay(.35,.5,.65,true);
+    const keys=highRegister?['marimba','harp','bell']:['strings','bowl','flute'];
+    for(let i=0;i<7;i++){c.renderTime=i*.8;for(let id=0;id<3;id++){a.setTraveller(id,1,(id-1)*.6);a.strike(highRegister?3136:[130.81,164.81,196][id],65,0,.5,id,keys[id]);}}
+    const output=await c.startRendering();let peak=0,finite=true;
+    for(let ch=0;ch<2;ch++)for(const v of output.getChannelData(ch)){finite&&=Number.isFinite(v);peak=Math.max(peak,Math.abs(v));}
+    report(highRegister?'High-register modes stay finite under dense playback':'Dense voices and long effect tails keep headroom',finite&&peak>.001&&peak<.81,`peak ${peak.toFixed(5)}`);
+  }
+  status.textContent=failures?`${failures} rendering checks failed`:`All ${checks} rendering checks passed`;
+}catch(error){status.textContent=`Render error: ${error.message}`;console.error(error);}
+</script></body></html>

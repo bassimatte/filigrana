@@ -294,3 +294,15 @@ main { grid-template-columns: minmax(0,1fr) 300px; gap: 32px; align-items: start
   .listening-panel { padding: 22px 0 0; border-left: 0; margin-top: 20px; }
   #voice-editor { scroll-margin-top: 18px; }
 }
+
+/* Luminous threads: quiet light around the drawing, with all controls kept visible. */
+.luminous-mode body { background: radial-gradient(ellipse at 22% 32%,#c5a7740b,transparent 55%),radial-gradient(ellipse at 62% 70%,#8bb4c00b,transparent 50%),var(--paper); }
+.luminous-mode .voice-chip { border-color: transparent; background: color-mix(in srgb,var(--surface) 55%,transparent); border-radius: 28px; }
+.luminous-mode .voice-chip.editing { background: color-mix(in srgb,var(--traveller) 9%,var(--paper)); }
+.luminous-mode .listening-panel { padding: 20px; border: 1px solid color-mix(in srgb,var(--line) 40%,transparent); border-radius: 16px; background: color-mix(in srgb,var(--paper) 78%,transparent); backdrop-filter: blur(16px); }
+.luminous-mode .transport { left: 50%; right: auto; bottom: 14px; transform: translateX(-50%); width: min(700px,calc(100% - 32px)); padding: 12px 16px; border: 1px solid color-mix(in srgb,var(--line) 60%,transparent); border-radius: 16px; background: var(--overlay); backdrop-filter: blur(18px); box-shadow: 0 8px 30px var(--shadow); }
+@media(max-width:700px) {
+  .luminous-mode .listening-panel { padding: 18px; }
+  .luminous-mode .transport { width: calc(100% - 24px); bottom: 10px; padding: 10px; }
+  .luminous-mode .transport button.play { min-width: 86px; }
+}

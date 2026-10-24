@@ -215,5 +215,14 @@ footer { justify-content: flex-end; }
 .settings-popover .hint { font-size: 10px; }
 .settings-popover h3 { margin: 0 0 12px; font-size: 17px; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; }
 .settings-section + .settings-section { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 18px; }
+.canvas-wrap.path-only { background: transparent; background-image: none; border-color: transparent; }
+.canvas-wrap.path-only #drawing { box-shadow: none; }
+.zoom-tools { position: absolute; z-index: 2; top: 12px; right: 12px; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 9px; background: var(--overlay); box-shadow: 0 3px 14px var(--shadow); }
+.zoom-tools button { min-width: 30px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font-size: 16px; }
+.zoom-tools button:hover { background: var(--surface); }
+.zoom-tools #zoom-reset { min-width: 45px; font-size: 10px; font-variant-numeric: tabular-nums; }
+#drawing.zoomed { cursor: grab; }
+#drawing.panning { cursor: grabbing; }
+.canvas-wrap.path-only #drawing.zoomed { cursor: grab; }
 .encoder-credits { display: inline-block; margin-top: 18px; font-size: 9px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 @media(max-width:700px) { .header-tools { gap: 8px; } .settings-menu>summary { width: 32px; height: 32px; } }

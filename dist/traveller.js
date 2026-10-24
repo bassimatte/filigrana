@@ -15,6 +15,7 @@ export class Traveller {
   restart(){if(!this.origin)return;this.random=seededRandom(`${this.seed}:${this.id}`);this.visits.fill(0);this.clearPhrase();this.start(this.origin.edgeId,this.origin.from,this.origin.distance);}
   position(){if(!this.walker)return null;const e=this.graph.edges[this.walker.edge];return pointOnEdge(e,this.walker.reverse?e.length-this.walker.distance:this.walker.distance);}
   advance(dt,speed,mode,onEdge=()=>{}){
+    this.pulse=Math.max(0,this.pulse-dt*.8);
     if(!this.enabled||!this.walker)return;
     let remaining=speed*dt;
     while(remaining>0&&this.walker){
@@ -28,7 +29,6 @@ export class Traveller {
         this.start(next,target);onEdge(this);
       }
     }
-    this.pulse=Math.max(0,this.pulse-dt*1.6);
   }
 }
 

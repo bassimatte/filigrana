@@ -133,6 +133,7 @@ function stop(){playbackClock.stop();playing=false;audio.silence();conversation.
 function place(t,edgeId,from,distance=0){threadLights.clear(t.id);audio.silenceChannel(t.id);conversation.remove(t.id);t.place(edgeId,from,distance);soundEdge(t);uiState();draw();}
 function paintRange(input){const min=+(input.getAttribute('min')||0),max=+(input.getAttribute('max')||100),value=+input.value;input.style.setProperty('--range-progress',`${Math.max(0,Math.min(100,(value-min)/(max-min)*100))}%`);}
 function refreshRanges(){document.querySelectorAll('input[type=range]').forEach(paintRange);}
+function syncScaleControl(){const scale=travellers[0]?.scale;$('global-scale').value=travellers.every(t=>t.scale===scale)?scale:'mixed';}
 function syncTraveller(t){
   for(const key of ['instrument','octave','scale'])$(`${key}-${t.id}`).value=t[key];$(`enabled-${t.id}`).checked=t.enabled;
   const ringLabel=isNoteVoice(t.instrument)?'Decay':'Ring';$(`expression-ring-label-${t.id}`).textContent=ringLabel;
@@ -140,6 +141,7 @@ function syncTraveller(t){
   for(const [key,value,unit]of [['speed',t.speed,' px/s'],['spacing',t.spacing,' s'],['volume',Math.round(t.volume*100),'%'],['ring',t.ring,ringValue],['pan',Math.round(t.pan*100),'']]){
     $(`expression-${key}-${t.id}`).value=value;paintRange($(`expression-${key}-${t.id}`));$(`expression-${key}-value-${t.id}`).textContent=key==='pan'?(value===0?'Center':`${Math.abs(value)}% ${value<0?'L':'R'}`):key==='ring'?unit:value+unit;
   }
+  syncScaleControl();
 }
 function mountTravellers(){
   for(const t of travellers){
@@ -177,11 +179,17 @@ function mountTravellers(){
     for(const kind of ['octave','scale'])$(`${kind}-${t.id}`).onchange=()=>{
       t[kind]=kind==='octave'?+$(`${kind}-${t.id}`).value:$(`${kind}-${t.id}`).value;
       conversation.remove(t.id);
+      if(kind==='scale')syncScaleControl();
       if(playing&&t.enabled&&t.walker&&!isNoteVoice(t.instrument)){const hz=pitch(t,graph.edges[t.walker.edge]);audio.tune(hz,t.ring,t.id);t.heardPitch=hz;}
       draw();message();
     };
   }
 }
+$('global-scale').onchange=()=>{
+  const scale=$('global-scale').value;if(!Object.hasOwn(SCALES,scale))return;
+  for(const t of travellers){t.scale=scale;$(`scale-${t.id}`).value=scale;conversation.remove(t.id);if(playing&&t.enabled&&t.walker&&!isNoteVoice(t.instrument)){const hz=pitch(t,graph.edges[t.walker.edge]);audio.tune(hz,t.ring,t.id);t.heardPitch=hz;}}
+  syncScaleControl();customMood();draw();message();
+};
 async function loadImage(src,name){
   const id=++loadId;stop();busy=true;uiState();message('Reading the image…');
   try{

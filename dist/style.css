@@ -225,6 +225,7 @@ footer { justify-content: flex-end; }
 .settings-popover .hint { font-size: 10px; }
 .settings-popover h3 { margin: 0 0 12px; font-size: 17px; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; }
 .settings-section + .settings-section { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 18px; }
+.settings-popover input[type="number"] { width: 100%; border: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--ink); padding: 10px 8px; font: inherit; }
 .canvas-wrap.luminous { background: transparent; background-image: none; border-color: transparent; }
 .canvas-wrap.luminous #drawing { box-shadow: none; }
 .zoom-tools { position: absolute; z-index: 2; top: 12px; right: 12px; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 9px; background: var(--overlay); box-shadow: 0 3px 14px var(--shadow); }

@@ -9,7 +9,7 @@ import {bellPitch,bellDecay,curvature,noteName,tunePitch,SCALES} from './music.j
 import {Traveller,defaultStarts} from './traveller.js?v=2';
 import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=6';
 import {Conversation,pieceEnvelope} from './performance.js';
-import {CONTROL_LIMITS,validateComposition} from './composition.js?v=6';
+import {CONTROL_LIMITS,validateComposition} from './composition.js?v=7';
 const icon=name=>`<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-${name}"/></svg>`;
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
@@ -325,7 +325,7 @@ for(const [id,unit] of [['speed','%'],['tuning',' Hz'],['q',''],['volume','%'],[
 };
 $('delay-enabled').onchange=()=>{updateLabels();updateEffects();};
 $('interaction').onchange=()=>{audio.silence();conversation.reset();lastSpeaker=null;updateLabels();if(playing){audio.setVolume(settings().volume*pieceEnvelope(totalTime,settings().duration).gain);for(const t of active()){t.phrasing.reset();soundEdge(t);}answer();}};
-$('seed').onchange=()=>message('The new journey seed will apply when you press Restart.');
+$('seed').onchange=()=>{const value=Number($('seed').value);$('seed').value=String(Number.isFinite(value)?Math.max(0,Math.min(2147483647,Math.round(value))):1);message('The new journey seed will apply when you press Restart.');};
 function applyPreset(key){
   const mood=PRESETS[key];audio.silence();conversation.reset();lastSpeaker=null;
   for(const t of travellers){t.instrument=mood.keys[t.id];t.octave=mood.octaves[t.id];t.speed=mood.speeds[t.id];t.spacing=mood.spacing[t.id];t.volume=mood.volumes[t.id];t.pan=(t.id-1)*.4;t.scale='pentatonic';t.phrasing.reset();t.heardPitch=null;syncTraveller(t);audio.setTraveller(t.id,t.volume,t.pan);}

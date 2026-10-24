@@ -207,3 +207,10 @@ footer { padding-top: 18px; padding-bottom: 18px; }
   .transport-status { flex-direction: column; gap: 3px; font-size: 10px; }
   .transport-status #state { display: none; }
 }
+
+/* Keep the opening screen quiet; status text appears only when needed. */
+.listening-panel .moods { padding-top: 2px; }
+.upload-privacy { margin: -2px 0 12px; text-align: right; color: var(--muted); font-size: 10px; }
+.drawing-caption { justify-content: flex-start; }
+footer { justify-content: flex-end; }
+@media(max-width:700px) { .upload-privacy { text-align: left; } }

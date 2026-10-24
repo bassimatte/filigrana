@@ -44,7 +44,7 @@ document.addEventListener('filigrana-theme-change',refreshPalette);
 const settings=()=>({speed:+$('speed').value/100,tuning:+$('tuning').value,q:+$('q').value,volume:+$('volume').value/100,mode:$('branch').value,interaction:$('interaction').value,gap:+$('response-gap').value,duration:+$('duration').value,room:+$('room').value/100,delayTime:+$('delay-time').value/1000,delayMix:+$('delay-mix').value/100,delayFeedback:+$('delay-feedback').value/100,delayEnabled:$('delay-enabled').checked});
 function updateEffects(){const s=settings();audio.setRoom(s.room);audio.setDelay(s.delayTime,s.delayMix,s.delayFeedback,s.delayEnabled);}
 const active=()=>travellers.filter(t=>t.enabled&&t.walker);
-function message(text){$('message').textContent=text;}
+function message(text=''){$('message').textContent=text;$('message').hidden=!text;}
 function pitch(t,edge){const s=settings();return isNoteVoice(t.instrument)?bellPitch(edge.length,graph,s.tuning,t.scale,t.octave):tunePitch(resonance(edge,graph,s.tuning),s.tuning,t.scale,t.octave,28,96);}
 function perform(t,note){
   const s=settings();if(!t.enabled||!t.walker)return;
@@ -82,7 +82,8 @@ function uiState(){
     $(`place-${t.id}`).setAttribute('aria-pressed',t.id===selected);$(`place-${t.id}`).disabled=busy||!graph?.edges.length;
     $(`enabled-${t.id}`).checked=t.enabled;
   }
-  if(!busy&&graph?.edges.length)$('canvas-note').textContent=`Drag a point · Voice ${selected+1} selected`;
+  $('canvas-note').parentElement.hidden=!busy&&Boolean(graph?.edges.length);
+  $('canvas-note').textContent=busy?'Reading drawing…':'No paths detected';
   voiceOverview();audio.setActiveCount(active().length);
 }
 function stop(){playing=false;audio.silence();conversation.reset();lastSpeaker=null;if(recording)endRecording();uiState();}
@@ -116,10 +117,10 @@ function mountTravellers(){
       if(key==='spacing'){t.phrasing.next=totalTime+t.spacing*(instrument(t.instrument).spacing||1);conversation.remove(t.id);}
       audio.setTraveller(t.id,t.volume,t.pan);syncTraveller(t);
     };
-    $(`place-${t.id}`).onclick=()=>{selectVoice(t.id);message(`Voice ${t.id+1} selected. Click a line or junction to place its starting point.`);};
+    $(`place-${t.id}`).onclick=()=>{selectVoice(t.id);message();};
     $(`instrument-${t.id}`).onchange=()=>{
       audio.silenceChannel(t.id);conversation.remove(t.id);t.instrument=$(`instrument-${t.id}`).value;t.phrasing.reset();t.heardPitch=null;updateLabels();soundEdge(t);voiceOverview();draw();
-      message(`Voice ${t.id+1} now plays ${instrument(t.instrument).label.toLowerCase()}.`);
+      message();
     };
     $(`enabled-${t.id}`).onchange=()=>{
       t.enabled=$(`enabled-${t.id}`).checked;
@@ -130,7 +131,7 @@ function mountTravellers(){
       t[kind]=kind==='octave'?+$(`${kind}-${t.id}`).value:$(`${kind}-${t.id}`).value;
       conversation.remove(t.id);
       if(playing&&t.enabled&&t.walker&&!isNoteVoice(t.instrument)){const hz=pitch(t,graph.edges[t.walker.edge]);audio.tune(hz,settings().q,t.id);t.heardPitch=hz;}
-      draw();message(`Voice ${t.id+1}: ${SCALES[t.scale].label}, ${t.octave>0?'+':''}${t.octave} octave. Note changes apply to the next strike.`);
+      draw();message();
     };
   }
 }
@@ -154,7 +155,7 @@ async function analyse(){
     $('junction-count').textContent=`${graph.junctions.length} junctions`;
     if(graph.edges.length){
       defaultStarts(graph).forEach((start,i)=>travellers[i].place(start.edgeId,start.from,start.distance));
-      message(`Your drawing is ready. Press Listen. Drag a colored point, or tap a voice and click a line to move its start.`);
+      message();
     }else{
       message('No usable lines found. Increase ink sensitivity, or try a clearer drawing on plain paper.');$('canvas-note').textContent='No paths detected';$('frequency').textContent='—';$('edge-length').textContent='Try another sensitivity';
     }
@@ -166,10 +167,10 @@ function locateClick(event){
   const rect=canvas.getBoundingClientRect(),x=(event.clientX-rect.left)*canvas.width/rect.width,y=(event.clientY-rect.top)*canvas.height/rect.height,t=travellers[selected];
   let nearest=Infinity,choice=null;
   for(const node of graph.junctions){const d=Math.hypot(node.x-x,node.y-y);if(d<12&&d<nearest){nearest=d;choice={node};}}
-  if(choice){const n=choice.node,id=chooseEdge(graph,n.id,null,$('branch').value,null,Math.random,t.visits);place(t,id,n.id);message(`Voice ${selected+1} placed at a junction. The other starting points are unchanged.`);return;}
+  if(choice){const n=choice.node,id=chooseEdge(graph,n.id,null,$('branch').value,null,Math.random,t.visits);place(t,id,n.id);message();return;}
   for(const e of graph.edges)for(let i=0;i<e.points.length;i++){const p=e.points[i],d=Math.hypot(p.x-x,p.y-y);if(d<nearest){nearest=d;choice={e,i};}}
   if(!choice||nearest>35){message('Click closer to a detected line, or turn on Paths to see the network.');return;}
-  place(t,choice.e.id,choice.e.a,choice.e.lengths[choice.i]);message(`Voice ${selected+1} placed on the ink.`);
+  place(t,choice.e.id,choice.e.a,choice.e.lengths[choice.i]);message();
 }
 function draw(){
   if(!image)return;
@@ -200,11 +201,12 @@ function frame(now){
     totalTime+=dt;const s=settings(),form=pieceEnvelope(totalTime,s.duration);audio.setVolume(s.volume*form.gain);
     for(const t of travellers){t.advance(dt,t.speed*s.speed,s.mode,soundEdge);if(t.enabled&&t.walker&&isNoteVoice(t.instrument)){const e=graph.edges[t.walker.edge];audio.colour(curvature(e,t.walker.reverse?e.length-t.walker.distance:t.walker.distance),t.id);}}
     if(form.acceptNotes)answer();else conversation.pending.clear();
-    if(form.finished){finished=true;stop();message('The piece has ended with a gentle fade. Listen again to replay it from your starting points.');}
+    if(form.finished){finished=true;stop();message();}
     if(!active().length)stop();draw();
   }
-  const s=settings(),form=pieceEnvelope(totalTime,s.duration),status=finished?'The piece has ended.':playing&&!form.acceptNotes?'Letting the last notes fade…':s.interaction==='conversation'?(lastSpeaker===null?'Listening for the first phrase.':`Voice ${lastSpeaker+1} is answering.`):'Independent voices · each follows its own rhythm.';
+  const s=settings(),form=pieceEnvelope(totalTime,s.duration),status=finished?'Finished.':playing&&!form.acceptNotes?'Last notes…':'';
   if($('performance-status').textContent!==status)$('performance-status').textContent=status;
+  $('performance-status').hidden=!status;
   $('elapsed').textContent=`${String(Math.floor(totalTime/60)).padStart(2,'0')}:${String(Math.floor(totalTime%60)).padStart(2,'0')}`;
   sx.clearRect(0,0,scope.width,scope.height);sx.strokeStyle=palette.green;sx.lineWidth=1.5;sx.beginPath();
   if(audio.analyser&&playing){const data=new Uint8Array(audio.analyser.fftSize);audio.analyser.getByteTimeDomainData(data);for(let i=0;i<data.length;i++){const x=i/(data.length-1)*scope.width,y=scope.height/2+(data[i]-128)/128*scope.height*.46;i?sx.lineTo(x,y):sx.moveTo(x,y);}}
@@ -212,11 +214,11 @@ function frame(now){
 }
 $('play').onclick=async()=>{
   if(playing){stop();return;}if(!active().length||busy)return;
-  try{await audio.init();if(finished)restart();playing=true;const s=settings();conversation.reset();lastSpeaker=null;audio.setActiveCount(active().length);audio.setVolume(s.volume*pieceEnvelope(totalTime,s.duration).gain);for(const t of active()){audio.setTraveller(t.id,t.volume,t.pan);t.phrasing.reset();soundEdge(t);}answer();uiState();message('Follow the colored points. Tap a voice to change its sound.');}
+  try{await audio.init();if(finished)restart();playing=true;const s=settings();conversation.reset();lastSpeaker=null;audio.setActiveCount(active().length);audio.setVolume(s.volume*pieceEnvelope(totalTime,s.duration).gain);for(const t of active()){audio.setTraveller(t.id,t.volume,t.pan);t.phrasing.reset();soundEdge(t);}answer();uiState();message();}
   catch(e){stop();message(`Could not start audio: ${e.message}`);}
 };
 function restart(){audio.silence();conversation.reset();lastSpeaker=null;totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.restart();}if(playing){audio.setVolume(settings().volume*pieceEnvelope(0,settings().duration).gain);for(const t of active())soundEdge(t);answer();}uiState();draw();}
-$('reset').onclick=()=>{restart();message('All travellers returned to their own starting points and journey seed.');};
+$('reset').onclick=()=>{restart();message();};
 $('original').onclick=()=>{photo=!photo;$('original').setAttribute('aria-pressed',photo);paintPaths();draw();};
 $('network').onclick=()=>{paths=!paths;$('network').setAttribute('aria-pressed',paths);draw();};
 canvas.addEventListener('pointerdown',event=>{
@@ -257,16 +259,16 @@ const MOODS={
   floating:{keys:['flute','strings','bell'],octaves:[0,-1,1],speeds:[18,16,26],spacing:[5,6,4],volumes:[.65,.55,.45],room:48,ring:48,pace:85,gap:3.6,description:'Airy flute, soft strings, and distant bells.'}
 };
 function applyMood(key){
-  const mood=MOODS[key];audio.silence();conversation.reset();lastSpeaker=null;$('interaction').value='conversation';
+  const mood=MOODS[key];audio.silence();conversation.reset();lastSpeaker=null;
   for(const t of travellers){t.instrument=mood.keys[t.id];t.octave=mood.octaves[t.id];t.speed=mood.speeds[t.id];t.spacing=mood.spacing[t.id];t.volume=mood.volumes[t.id];t.pan=(t.id-1)*.4;t.scale='pentatonic';t.phrasing.reset();t.heardPitch=null;syncTraveller(t);audio.setTraveller(t.id,t.volume,t.pan);}
   for(const [id,value,unit]of [['room',mood.room,'%'],['q',mood.ring,''],['speed',mood.pace,'%'],['response-gap',mood.gap,' s']]){$(id).value=value;$(`${id}-value`).textContent=value+unit;}
   document.querySelectorAll('[data-mood]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mood===key)));
-  $('mood-description').textContent=mood.description;updateEffects();updateLabels();voiceOverview();
+  updateEffects();updateLabels();voiceOverview();
   if(playing){audio.setVolume(settings().volume*pieceEnvelope(totalTime,settings().duration).gain);for(const t of active())soundEdge(t);answer();}draw();
 }
-function customMood(){document.querySelectorAll('[data-mood]').forEach(button=>button.setAttribute('aria-pressed','false'));$('mood-description').textContent='Your own arrangement.';}
-for(const button of document.querySelectorAll('[data-mood]'))button.onclick=()=>{applyMood(button.dataset.mood);message(`${button.querySelector('strong').textContent}: ${MOODS[button.dataset.mood].description} Your starting points are preserved.`);};
-$('calm-trio').onclick=()=>{applyMood('still');message('The calm trio is ready. Your starting points are preserved.');};
+function customMood(){document.querySelectorAll('[data-mood]').forEach(button=>button.setAttribute('aria-pressed','false'));}
+for(const button of document.querySelectorAll('[data-mood]'))button.onclick=()=>{applyMood(button.dataset.mood);message();};
+$('calm-trio').onclick=()=>{applyMood('still');message();};
 document.addEventListener('input',event=>{if(event.target.matches('input[type=range],select'))customMood();});
 document.addEventListener('change',event=>{if(event.target.matches('select,#delay-enabled'))customMood();});
 $('analyse').onclick=analyse;
@@ -286,7 +288,7 @@ $('save-score').onclick=async()=>{
       const {instrument,scale,enabled,octave,speed,spacing,volume,pan}=t,e=graph.edges[t.origin.edgeId],reverse=e.b===t.origin.from&&e.a!==t.origin.from,p=pointOnEdge(e,reverse?e.length-t.origin.distance:t.origin.distance);
       return {instrument,scale,enabled,octave,speed,spacing,volume,pan,origin:{...t.origin,x:p.x/graph.w,y:p.y/graph.h}};
     })};
-    validateComposition(score);download(new Blob([JSON.stringify(score)],{type:'application/json'}),'filigrana.line-score.json');message('Composition saved with its image, starting points, expression, effects, and journey seed.');
+    validateComposition(score);download(new Blob([JSON.stringify(score)],{type:'application/json'}),'filigrana.line-score.json');message('Composition saved.');
   }catch(error){message(`Could not save the composition: ${error.message}`);}finally{uiState();}
 };
 $('load-score').onchange=async event=>{
@@ -306,7 +308,7 @@ $('load-score').onchange=async event=>{
       if(matched)t.place(origin.edgeId,origin.from,origin.distance);
       else{let nearest=Infinity,choice=null;for(const edge of graph.edges)for(let i=0;i<edge.points.length;i++){const p=edge.points[i],d=Math.hypot(p.x-origin.x*graph.w,p.y-origin.y*graph.h);if(d<nearest){nearest=d;choice={edge,i};}}if(choice)t.place(choice.edge.id,choice.edge.a,choice.edge.lengths[choice.i]);}
     }
-    customMood();updateEffects();updateLabels();uiState();draw();message('Composition loaded. Press Listen to replay its saved starting points and journey seed.');
+    customMood();updateEffects();updateLabels();uiState();draw();message('Composition loaded.');
   }catch(error){message(`Could not load the composition: ${error.message}`);}finally{event.target.value='';uiState();}
 };
 function endRecording(){if(!recording)return;recording=false;audio.stopRecording();uiState();}
@@ -314,9 +316,9 @@ $('record').onclick=()=>{
   if(recording){endRecording();return;}
   try{audio.record(blob=>{
     if(downloadURL)URL.revokeObjectURL(downloadURL);downloadURL=URL.createObjectURL(blob);
-    const a=document.createElement('a'),ext=blob.type.includes('ogg')?'ogg':blob.type.includes('mp4')?'m4a':'webm';a.href=downloadURL;a.download=`filigrana-${new Date().toISOString().slice(0,19).replaceAll(':','-')}.${ext}`;a.click();message('Recording saved with all instruments, reverb, and delay.');
-  });recording=true;uiState();message('Recording all active travellers. Press Save recording or Pause to download your take.');}
+    const a=document.createElement('a'),ext=blob.type.includes('ogg')?'ogg':blob.type.includes('mp4')?'m4a':'webm';a.href=downloadURL;a.download=`filigrana-${new Date().toISOString().slice(0,19).replaceAll(':','-')}.${ext}`;a.click();message('Recording saved.');
+  });recording=true;uiState();message('Recording…');}
   catch(e){message(e.message);}
 };
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing){stop();message('Paused while this tab was hidden. Press Listen to continue.');}});
-mountTravellers();refreshPalette();applyMood('still');updateLabels();requestAnimationFrame(frame);loadImage('drawing.jpg','Example drawing');
+mountTravellers();refreshPalette();applyMood('floating');updateLabels();requestAnimationFrame(frame);loadImage('drawing.jpg','Example drawing');

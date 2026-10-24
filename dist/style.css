@@ -414,6 +414,10 @@ label:hover output, label:has(+ input[type=range]:is(:focus-visible,:active,:hov
 .drawing-settings-popover .hint { margin: 0 0 14px; }
 .drawing-settings-popover #analyse { width: 100%; }
 .drawing-settings-button { width: 36px; justify-content: center; padding: 7px; }
+.drawing-actions .zoom-tools { position: static; z-index: auto; top: auto; right: auto; gap: 3px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.drawing-actions .zoom-tools button { width: 30px; min-width: 30px; height: 34px; padding: 5px; border: 1px solid color-mix(in srgb,var(--line) 75%,transparent); border-radius: 7px; background: transparent; color: var(--ink); }
+.drawing-actions .zoom-tools button:hover { border-color: var(--green); background: var(--field); }
+.drawing-actions .zoom-tools #zoom-reset { min-width: 66px; }
 .view-mode-select { position: relative; display: inline-flex; min-width: 0; }
 .view-mode-select select { padding-left: 34px; }
 .view-mode-icon { position: absolute; z-index: 1; left: 9px; top: 50%; width: 16px; height: 16px; transform: translateY(-50%); color: var(--green); pointer-events: none; }

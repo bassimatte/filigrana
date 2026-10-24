@@ -114,7 +114,7 @@ function soundEdge(t){
 }
 function uiState(){
   $('play-label').textContent=playing?'Pause':recordPreparing?'Cancel':finished?'Listen again':'Listen';$('play-icon').innerHTML=icon(playing?'pause':recordPreparing?'close':'play');
-  $('state').textContent=busy?'ANALYSING':playing?`${active().length} TRAVELLING`:finished?'FINISHED':graph?.edges.length?'READY':'NO PATHS';
+  $('state').textContent=busy?'ANALYSING':!image?'UPLOAD DRAWING':playing?`${active().length} TRAVELLING`:finished?'FINISHED':graph?.edges.length?'READY':'NO PATHS';
   $('play').disabled=busy||!active().length;$('reset').disabled=busy||!travellers.some(t=>t.origin);$('record').disabled=recordPreparing||recordSaving||busy||!active().length||!canRecord();
   $('record-label').textContent=recordPreparing?'Preparing…':recordSaving?'Saving…':recording?'Save recording':'Record';$('record-icon').innerHTML=icon(recordPreparing||recordSaving?'loader':recording?'stop':'record');$('record').setAttribute('aria-pressed',String(recording));$('record').setAttribute('aria-busy',String(recordPreparing||recordSaving));$('record-indicator').hidden=!recording;recordingInfo();$('record').classList.toggle('recording',recording);$('record').classList.toggle('busy',recordPreparing||recordSaving);
   $('save-score').disabled=busy||!image||!graph?.edges.length;
@@ -124,7 +124,7 @@ function uiState(){
     $(`enabled-${t.id}`).checked=t.enabled;
   }
   $('canvas-note').parentElement.hidden=!busy&&Boolean(graph?.edges.length);
-  $('canvas-note').textContent=busy?'Reading drawing…':'No paths detected';
+  $('canvas-note').textContent=!image?'Upload a drawing to begin':busy?'Reading drawing…':'No paths detected';
   voiceOverview();audio.setActiveCount(active().length);
 }
 function stop(){playbackClock.stop();playing=false;audio.silence();conversation.reset();lastSpeaker=null;if(recordPreparing)cancelRecordingPreparation();else if(recording)endRecording();uiState();}
@@ -417,4 +417,4 @@ $('record').onclick=async()=>{
   }
 };
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){draw();musicDirty=false;}});
-mountTravellers();refreshPalette();applyPreset('floating');updateLabels();requestAnimationFrame(frame);loadImage('drawing.jpg','Example drawing');
+mountTravellers();refreshPalette();applyPreset('floating');updateLabels();uiState();requestAnimationFrame(frame);

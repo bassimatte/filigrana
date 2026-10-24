@@ -10,7 +10,10 @@ import {Conversation,pieceEnvelope} from './performance.js';
 import {CONTROL_LIMITS,validateComposition} from './composition.js?v=6';
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
-let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,photo=true,paths=true,totalTime=0,loadId=0,maskLayer=null,downloadURL=null,finished=false,lastSpeaker=null;
+let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,visualMode='trace',totalTime=0,loadId=0,maskLayer=null,downloadURL=null,finished=false,lastSpeaker=null;
+try{const saved=localStorage.getItem('filigrana-visual-mode');if(['trace','dim','paths'].includes(saved))visualMode=saved;}catch{}
+$('visual-mode').value=visualMode;
+$('visual-mode').onchange=()=>{visualMode=$('visual-mode').value;try{localStorage.setItem('filigrana-visual-mode',visualMode);}catch{}paintPaths();draw();};
 let recorder=null,pendingRecorder=null,recordPreparing=false,recordSaving=false,recordGeneration=0;
 try{const saved=localStorage.getItem('filigrana-recording-format');if(['mp3','wav'].includes(saved))$('record-format').value=saved;}catch{}
 function recordingInfo(){
@@ -41,17 +44,17 @@ function selectVoice(id,toggle=false){
   selected=id;openVoice=toggle&&openVoice===id?null:id;uiState();updateLabels();draw();
 }
 
-let palette={paper:'#f4f1e9',green:'#527153',photoPath:'#527153'};
+let palette={paper:'#f4f1e9',green:'#527153'};
 const photoColours=['#a94c2c','#276b86','#79518d'];
 function paintPaths(){
   if(!maskLayer||!graph)return;
   const mctx=maskLayer.getContext('2d');mctx.clearRect(0,0,maskLayer.width,maskLayer.height);
-  mctx.strokeStyle=photo?palette.photoPath:palette.green;mctx.lineWidth=1.1;
+  mctx.strokeStyle=visualMode==='dim'?'#c8d5c1':palette.green;mctx.lineWidth=1.1;
   for(const e of graph.edges){mctx.beginPath();e.points.forEach((p,i)=>i?mctx.lineTo(p.x,p.y):mctx.moveTo(p.x,p.y));mctx.stroke();}
 }
 function refreshPalette(){
   const styles=getComputedStyle(document.documentElement),value=key=>styles.getPropertyValue(key).trim();
-  palette={paper:value('--paper'),green:value('--green'),photoPath:value('--photo-path')};
+  palette={paper:value('--paper'),green:value('--green')};
   for(const t of travellers)t.colour=value(`--voice-${t.id+1}`);
   paintPaths();draw();
 }
@@ -185,23 +188,24 @@ function locateClick(event){
   for(const node of graph.junctions){const d=Math.hypot(node.x-x,node.y-y);if(d<12&&d<nearest){nearest=d;choice={node};}}
   if(choice){const n=choice.node,id=chooseEdge(graph,n.id,null,$('branch').value,null,Math.random,t.visits);place(t,id,n.id);message();return;}
   for(const e of graph.edges)for(let i=0;i<e.points.length;i++){const p=e.points[i],d=Math.hypot(p.x-x,p.y-y);if(d<nearest){nearest=d;choice={e,i};}}
-  if(!choice||nearest>35){message('Click closer to a detected line, or turn on Paths to see the network.');return;}
+  if(!choice||nearest>35){message('Click closer to a detected line to choose its start.');return;}
   place(t,choice.e.id,choice.e.a,choice.e.lengths[choice.i]);message();
 }
 function draw(){
   if(!image)return;
-  ctx.fillStyle=photo?'#f4f1e9':palette.paper;ctx.fillRect(0,0,canvas.width,canvas.height);
-  if(photo){ctx.globalAlpha=.82;ctx.drawImage(image,0,0,canvas.width,canvas.height);ctx.globalAlpha=1;}
-  if(paths&&maskLayer){ctx.globalAlpha=photo?.48:.8;ctx.drawImage(maskLayer,0,0);ctx.globalAlpha=1;}
-  if(paths&&graph){ctx.fillStyle=photo?palette.photoPath:palette.green;for(const n of graph.junctions){ctx.beginPath();ctx.arc(n.x,n.y,1.8,0,Math.PI*2);ctx.fill();}}
+  ctx.fillStyle=palette.paper;ctx.fillRect(0,0,canvas.width,canvas.height);
+  if(visualMode!=='paths'){ctx.globalAlpha=visualMode==='dim'?.52:.58;ctx.drawImage(image,0,0,canvas.width,canvas.height);ctx.globalAlpha=1;}
+  if(visualMode==='dim'){ctx.fillStyle='rgba(10,17,15,.58)';ctx.fillRect(0,0,canvas.width,canvas.height);}
+  if(maskLayer){ctx.globalAlpha=visualMode==='trace'?.23:visualMode==='dim'?.78:.82;ctx.drawImage(maskLayer,0,0);ctx.globalAlpha=1;}
+  if(graph){ctx.fillStyle=visualMode==='dim'?'#d7e3d1':palette.green;ctx.globalAlpha=visualMode==='trace'?.28:visualMode==='dim'?.84:.8;for(const n of graph.junctions){ctx.beginPath();ctx.arc(n.x,n.y,1.8,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;}
   if(!graph)return;
   for(const t of travellers){
     if(!t.walker){$(`traveller-note-${t.id}`).textContent='No path';continue;}
-    const e=graph.edges[t.walker.edge],colour=photo?photoColours[t.id]:t.colour;ctx.globalAlpha=t.enabled?1:.25;
-    ctx.strokeStyle=colour;ctx.lineWidth=t.id===selected?2.7:2;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();e.points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();
-    if(t.enabled)for(let i=0;i<t.trail.length;i+=2){ctx.globalAlpha=(i/t.trail.length)*.5;ctx.fillStyle=colour;ctx.beginPath();ctx.arc(t.trail[i].x,t.trail[i].y,1.5,0,Math.PI*2);ctx.fill();}
-    const p=drag?.id===t.id?drag.position:t.position();ctx.globalAlpha=t.enabled?.15:.06;ctx.fillStyle=colour;ctx.beginPath();ctx.arc(p.x,p.y,10+t.pulse*5,0,Math.PI*2);ctx.fill();ctx.globalAlpha=t.enabled?1:.35;
-    ctx.strokeStyle=photo?'#f4f1e9':palette.paper;ctx.fillStyle=colour;ctx.lineWidth=1.7;ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);ctx.fill();ctx.stroke();
+    const e=graph.edges[t.walker.edge],colour=photoColours[t.id];ctx.globalAlpha=(t.enabled?1:.25)*(visualMode==='trace'?.36:visualMode==='dim'?.9:.68);
+    ctx.strokeStyle=colour;ctx.lineWidth=visualMode==='trace'?1.6:t.id===selected?2.7:2;ctx.lineJoin='round';ctx.lineCap='round';if(visualMode==='dim'){ctx.shadowColor=colour;ctx.shadowBlur=10;}ctx.beginPath();e.points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();ctx.shadowBlur=0;
+    if(t.enabled)for(let i=0;i<t.trail.length;i+=2){ctx.globalAlpha=(i/t.trail.length)*(visualMode==='trace'?.24:visualMode==='dim'?.42:.32);ctx.fillStyle=colour;ctx.beginPath();ctx.arc(t.trail[i].x,t.trail[i].y,1.5,0,Math.PI*2);ctx.fill();}
+    const p=drag?.id===t.id?drag.position:t.position();ctx.globalAlpha=(t.enabled?(visualMode==='trace'?.09:visualMode==='dim'?.22:.12):.04);ctx.fillStyle=colour;ctx.beginPath();ctx.arc(p.x,p.y,10+t.pulse*5,0,Math.PI*2);ctx.fill();ctx.globalAlpha=t.enabled?1:.35;
+    ctx.strokeStyle=visualMode==='dim'?'#18221e':palette.paper;ctx.fillStyle=colour;ctx.lineWidth=1.7;ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);ctx.fill();ctx.stroke();
     ctx.font='bold 8px sans-serif';ctx.textAlign='center';ctx.fillStyle=colour;ctx.fillText(String(t.id+1),p.x,p.y-12);ctx.globalAlpha=1;
     const hz=t.heardPitch??pitch(t,e);
     $(`traveller-note-${t.id}`).textContent=`${t.enabled?'':'Off · '}${t.scale==='free'?`${hz.toFixed(1)} Hz`:noteName(hz)} · ${isNoteVoice(t.instrument)?`${t.strikes} ${t.strikes===1?'note':'notes'}`:'resonance'}`;
@@ -244,8 +248,6 @@ $('play').onclick=async()=>{
 };
 function restart(){playbackClock.reset();audio.silence();conversation.reset();lastSpeaker=null;totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.restart();}if(playing){audio.setVolume(settings().volume*pieceEnvelope(0,settings().duration).gain);for(const t of active())soundEdge(t);answer();}uiState();draw();}
 $('reset').onclick=()=>{restart();message();};
-$('original').onclick=()=>{photo=!photo;$('original').setAttribute('aria-pressed',photo);paintPaths();draw();};
-$('network').onclick=()=>{paths=!paths;$('network').setAttribute('aria-pressed',paths);draw();};
 canvas.addEventListener('pointerdown',event=>{
   if(busy||!graph?.edges.length||event.button!==0)return;
   const rect=canvas.getBoundingClientRect(),x=(event.clientX-rect.left)*canvas.width/rect.width,y=(event.clientY-rect.top)*canvas.height/rect.height;

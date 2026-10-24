@@ -19,7 +19,6 @@
   --voice-1: #a94c2c;
   --voice-2: #276b86;
   --voice-3: #79518d;
-  --photo-path: #527153;
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -214,5 +213,7 @@ footer { justify-content: flex-end; }
 .settings-popover h2 { margin: 0 0 18px; font-size: 25px; }
 .settings-popover label { margin-top: 0; }
 .settings-popover .hint { font-size: 10px; }
+.settings-popover h3 { margin: 0 0 12px; font-size: 17px; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; }
+.settings-section + .settings-section { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 18px; }
 .encoder-credits { display: inline-block; margin-top: 18px; font-size: 9px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 @media(max-width:700px) { .header-tools { gap: 8px; } .settings-menu>summary { width: 32px; height: 32px; } }

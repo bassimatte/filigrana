@@ -231,8 +231,4 @@ footer { justify-content: flex-end; }
 .canvas-wrap #drawing { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; object-fit: fill; box-shadow: none; }
 .canvas-wrap #drawing.panning { cursor: grabbing; }
 
-/* Zoom gives the drawing the full first column, including its controls' space. */
 .workspace { min-width: 0; }
-.workspace.drawing-focus > :not(.canvas-wrap):not(#message) { display: none !important; }
-.workspace.drawing-focus .canvas-wrap { width: 100%; height: calc(100svh - 210px); min-height: 420px; max-height: none; }
-@media(max-width:700px) { .workspace.drawing-focus .canvas-wrap { height: calc(100svh - 190px); min-height: 350px; } }

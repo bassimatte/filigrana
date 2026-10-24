@@ -413,6 +413,19 @@ label:hover output, label:has(+ input[type=range]:is(:focus-visible,:active,:hov
 .drawing-settings-popover input[type=range] { margin: 13px 0 16px; }
 .drawing-settings-popover .hint { margin: 0 0 14px; }
 .drawing-settings-popover #analyse { width: 100%; }
+/* Bring interactive text up to a more comfortable reading size. */
+label:not(.upload), .control-group>summary { font-size: 12px; }
+.hint, .explanation p, .drawing-caption, #message, .settings-popover .hint { font-size: 12px; }
+.listening-panel label:not(.upload), .settings-popover label, .voice-settings .traveller-fields label, .listening-panel .voice-settings .traveller-fields label, .traveller label.enable-label, .voice-settings .traveller label.enable-label { font-size: 12px; }
+.listening-panel .hint { font-size: 12px; }
+output { font-size: 11px; }
+select, .secondary { font-size: 12px; }
+.canvas-note { font-size: 12px; }
+.voice-button strong { font-size: 12px; }
+.voice-button span span, .voice-mute, .traveller-note, .place-button { font-size: 11px; }
+.traveller-heading { font-size: 11px; }
+.voice-number { font-size: 11px; }
+.effect-heading label.effect-toggle { font-size: 12px; }
 .drawing-settings-button { width: 36px; justify-content: center; padding: 7px; }
 .drawing-actions .zoom-tools { position: static; z-index: auto; top: auto; right: auto; gap: 3px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .drawing-actions .zoom-tools button { width: 30px; min-width: 30px; height: 34px; padding: 5px; border: 1px solid color-mix(in srgb,var(--line) 75%,transparent); border-radius: 7px; background: transparent; color: var(--ink); }

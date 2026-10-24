@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 700" role="img" aria-labelledby="title desc">
+  <title id="title">Branching plant</title>
+  <desc id="desc">A spare, branching plant drawn in continuous dark strokes.</desc>
+  <rect width="600" height="700" fill="#fff"/>
+  <g fill="none" stroke="#111" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M300 645 C297 570 302 505 300 438 C298 366 300 305 300 214"/>
+    <path d="M300 505 C265 488 230 458 199 421 C178 396 163 367 151 337"/>
+    <path d="M300 505 C338 485 373 454 402 420 C426 393 442 365 453 335"/>
+    <path d="M300 414 C266 390 239 363 217 331 C199 304 187 276 180 245"/>
+    <path d="M300 414 C335 391 362 363 385 331 C405 303 416 275 421 244"/>
+    <path d="M300 319 C277 296 259 270 250 241 C244 222 243 204 245 185"/>
+    <path d="M300 319 C322 295 340 270 349 241 C355 222 357 203 354 184"/>
+    <path d="M151 337 C127 331 106 316 95 294 C91 279 96 266 110 261 C131 256 146 281 151 337Z"/>
+    <path d="M199 421 C175 420 154 409 143 389 C139 375 145 363 159 360 C179 359 193 385 199 421Z"/>
+    <path d="M453 335 C477 329 497 313 507 291 C510 277 504 264 490 260 C470 257 458 282 453 335Z"/>
+    <path d="M402 420 C426 418 447 406 457 386 C460 372 454 360 440 358 C420 359 407 384 402 420Z"/>
+  </g>
+</svg>

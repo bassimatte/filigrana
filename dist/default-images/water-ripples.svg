@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" role="img" aria-labelledby="title desc">
+  <title id="title">Water ripples</title>
+  <desc id="desc">Four separate, gently irregular rings spreading across white paper.</desc>
+  <rect width="600" height="600" fill="#fff"/>
+  <g fill="none" stroke="#111" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M300 259 C323 259 341 278 341 301 C341 324 322 342 299 342 C276 341 258 323 259 300 C260 277 277 259 300 259Z"/>
+    <path d="M300 214 C348 213 386 251 387 299 C388 347 349 387 301 387 C252 388 213 349 213 300 C213 252 252 214 300 214Z"/>
+    <path d="M301 169 C374 170 433 228 433 301 C433 375 373 434 300 433 C227 432 168 374 168 300 C168 227 228 169 301 169Z"/>
+    <path d="M300 123 C399 123 478 202 478 301 C478 400 399 478 300 478 C201 478 122 399 122 300 C122 202 202 123 300 123Z"/>
+  </g>
+</svg>

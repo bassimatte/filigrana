@@ -336,9 +336,11 @@ function applyPreset(key){
   if(playing){audio.setVolume(settings().volume*pieceEnvelope(totalTime,settings().duration).gain);for(const t of active())soundEdge(t);answer();}draw();
 }
 function customMood(){$('preset').value=matchingPreset(travellers,{room:+$('room').value,ring:+$('q').value,pace:+$('speed').value,gap:+$('response-gap').value});}
-$('preset').innerHTML=Object.entries(PRESETS).map(([key,p])=>`<option value="${key}">${p.name}</option>`).join('')+'<option value="custom" disabled>Custom</option>';
+$('preset').innerHTML=Object.entries(PRESETS).map(([key,p])=>`<option value="${key}">${key==='still'?'Still · calm trio':p.name}</option>`).join('')+'<option value="custom" disabled>Custom</option>';
 $('preset').onchange=()=>{if(Object.hasOwn(PRESETS,$('preset').value)){applyPreset($('preset').value);message();}};
-$('calm-trio').onclick=()=>{applyPreset('still');message();};
+document.querySelectorAll('.control-group').forEach(group=>group.addEventListener('toggle',()=>{
+  if(group.open)document.querySelectorAll('.control-group[open]').forEach(other=>{if(other!==group)other.open=false;});
+}));
 document.addEventListener('input',event=>{if(event.target.id!=='preset'&&event.target.matches('input[type=range],select'))customMood();});
 document.addEventListener('change',event=>{if(event.target.id!=='preset'&&event.target.matches('select,#delay-enabled'))customMood();});
 $('analyse').onclick=analyse;

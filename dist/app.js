@@ -35,9 +35,10 @@ const playbackClock=new PlaybackClock(advanceMusic);
 let musicDirty=false;
 let openVoice=null,drag=null,suppressClick=false;
 function voiceOverview(){
+  $('voice-editor').hidden=openVoice===null;$('mix-controls').hidden=openVoice!==null;
   for(const t of travellers){
     const button=$(`voice-${t.id}`);if(!button)continue;
-    button.setAttribute('aria-expanded',String(openVoice===t.id));
+    button.setAttribute('aria-expanded',String(openVoice===t.id));button.closest('.voice-chip').classList.toggle('editing',openVoice===t.id);
     button.classList.toggle('selected',selected===t.id);button.classList.toggle('muted',!t.enabled);
     $(`voice-name-${t.id}`).textContent=instrument(t.instrument).label;
     $(`mute-${t.id}`).setAttribute('aria-pressed',String(!t.enabled));
@@ -47,7 +48,9 @@ function voiceOverview(){
 }
 function selectVoice(id,toggle=false){
   selected=id;openVoice=toggle&&openVoice===id?null:id;uiState();updateLabels();draw();
+  if(toggle&&openVoice!==null&&window.matchMedia?.('(max-width:700px)')?.matches)$('voice-editor').scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
 }
+$('back-to-mix').onclick=()=>{const id=openVoice;openVoice=null;voiceOverview();if(id!==null)$(`voice-${id}`).focus();};
 
 let palette={paper:'#f4f1e9',green:'#527153'};
 const photoColours=['#a94c2c','#276b86','#79518d'];
@@ -120,7 +123,7 @@ function syncTraveller(t){
 function mountTravellers(){
   for(const t of travellers){
     const card=document.createElement('section');card.className='traveller';card.id=`traveller-${t.id}`;card.style.setProperty('--traveller',`var(--voice-${t.id+1})`);card.setAttribute('aria-label',`Voice ${t.id+1} settings`);card.hidden=true;
-    card.innerHTML=`<div class="traveller-heading"><span><i></i>Voice ${t.id+1}</span><button type="button" class="close-voice" aria-label="Close voice ${t.id+1} settings">Close ×</button><label class="enable-label"><input id="enabled-${t.id}" type="checkbox" checked aria-label="Enable voice ${t.id+1}">On</label></div>
+    card.innerHTML=`<div class="traveller-heading"><span><i></i>Voice ${t.id+1}</span><label class="enable-label"><input id="enabled-${t.id}" type="checkbox" checked aria-label="Enable voice ${t.id+1}">On</label></div>
       <button class="place-button" id="place-${t.id}" aria-pressed="${t.id===0}" aria-label="Set start for voice ${t.id+1}">⌖ Set start</button>
       <div class="traveller-fields"><label for="instrument-${t.id}">Instrument</label><select id="instrument-${t.id}" aria-label="Instrument for voice ${t.id+1}">${Object.entries(INSTRUMENTS).map(([key,s])=>`<option value="${key}">${s.label}</option>`).join('')}</select>
       <label for="octave-${t.id}">Octave</label><select id="octave-${t.id}" aria-label="Octave for voice ${t.id+1}">${[-2,-1,0,1,2].map(o=>`<option value="${o}" ${o===0?'selected':''}>${o>0?'+':''}${o}${o===0?' · original':''}</option>`).join('')}</select>
@@ -128,7 +131,6 @@ function mountTravellers(){
       <p class="traveller-note" id="traveller-note-${t.id}">Waiting for ink…</p>
       <details class="traveller-expression"><summary>Expression <span>+</span></summary>${[['speed','Speed',10,240,1],['spacing','Note spacing',.8,12,.1],['volume','Volume',0,100,1],['pan','Stereo',-100,100,1]].map(([key,label,min,max,step])=>`<label for="expression-${key}-${t.id}">${label}<output id="expression-${key}-value-${t.id}"></output></label><input id="expression-${key}-${t.id}" aria-label="${label} for voice ${t.id+1}" type="range" min="${min}" max="${max}" step="${step}">`).join('')}</details>`;
     $('travellers').append(card);
-    card.querySelector('.close-voice').onclick=()=>{openVoice=null;voiceOverview();$(`voice-${t.id}`).focus();};
     const chip=document.createElement('div');chip.className='voice-chip';chip.style.setProperty('--traveller',`var(--voice-${t.id+1})`);
     chip.innerHTML=`<button type="button" class="voice-button" id="voice-${t.id}" aria-expanded="false" aria-controls="traveller-${t.id}" aria-label="Voice ${t.id+1} settings"><span class="voice-number">${t.id+1}</span><span><strong>Voice ${t.id+1}</strong><span id="voice-name-${t.id}"></span></span><span aria-hidden="true">⌄</span></button><button type="button" class="voice-mute" id="mute-${t.id}" aria-pressed="false" aria-label="Mute voice ${t.id+1}">On</button>`;
     $('voice-bar').append(chip);
@@ -140,7 +142,7 @@ function mountTravellers(){
       if(key==='spacing'){t.phrasing.next=totalTime+t.spacing*(instrument(t.instrument).spacing||1);conversation.remove(t.id);}
       audio.setTraveller(t.id,t.volume,t.pan);syncTraveller(t);
     };
-    $(`place-${t.id}`).onclick=()=>{selectVoice(t.id);message();};
+    $(`place-${t.id}`).onclick=()=>{selected=t.id;openVoice=null;uiState();updateLabels();draw();canvas.focus();message('Click a line to set this voice’s start.');};
     $(`instrument-${t.id}`).onchange=()=>{
       audio.silenceChannel(t.id);conversation.remove(t.id);t.instrument=$(`instrument-${t.id}`).value;t.phrasing.reset();t.heardPitch=null;updateLabels();soundEdge(t);voiceOverview();draw();
       message();
@@ -277,7 +279,7 @@ canvas.addEventListener('pointerdown',event=>{
   const cursor=screenPoint(event);let nearest=null,distance=20;
   for(const t of travellers){const position=t.position();if(!position)continue;const p=view.toScreen(position.x,position.y),d=Math.hypot(p.x-cursor.x,p.y-cursor.y);if(d<distance){nearest=t;distance=d;}}
   if(!nearest){if(view.zoom>1){event.preventDefault();panDrag={pointer:event.pointerId,x:event.clientX,y:event.clientY,moved:false,placeOnTap:true};canvas.setPointerCapture(event.pointerId);canvas.classList.add('panning');}return;}
-  event.preventDefault();selected=nearest.id;drag={id:nearest.id,pointer:event.pointerId,position:nearest.position()};canvas.setPointerCapture(event.pointerId);uiState();draw();
+  event.preventDefault();selected=nearest.id;if(openVoice!==null)openVoice=nearest.id;drag={id:nearest.id,pointer:event.pointerId,position:nearest.position()};canvas.setPointerCapture(event.pointerId);uiState();draw();
 });
 canvas.addEventListener('pointermove',event=>{
   if(panDrag?.pointer===event.pointerId){if(Math.hypot(event.clientX-panDrag.x,event.clientY-panDrag.y)>2)panDrag.moved=true;view.panBy(event.clientX-panDrag.x,event.clientY-panDrag.y);panDrag.x=event.clientX;panDrag.y=event.clientY;draw();return;}

@@ -85,9 +85,9 @@ function soundEdge(t){
   if(s.interaction==='conversation')conversation.offer(t.id,note);else perform(t,note);
 }
 function uiState(){
-  $('play-label').textContent=playing?'Pause':finished?'Listen again':'Listen';$('play-icon').textContent=playing?'Ⅱ':'▶';
+  $('play-label').textContent=playing?'Pause':recordPreparing?'Cancel':finished?'Listen again':'Listen';$('play-icon').textContent=playing?'Ⅱ':recordPreparing?'×':'▶';
   $('state').textContent=busy?'ANALYSING':playing?`${active().length} TRAVELLING`:finished?'FINISHED':graph?.edges.length?'READY':'NO PATHS';
-  $('play').disabled=busy||!active().length;$('reset').disabled=busy||!travellers.some(t=>t.origin);$('record').disabled=recordPreparing||recordSaving||!playing||!canRecord();
+  $('play').disabled=busy||!active().length;$('reset').disabled=busy||!travellers.some(t=>t.origin);$('record').disabled=recordPreparing||recordSaving||busy||!active().length||!canRecord();
   $('record').textContent=recordPreparing?'Preparing…':recordSaving?'Saving…':recording?'■ Save recording':'● Record';recordingInfo();$('record').classList.toggle('recording',recording);
   $('save-score').disabled=busy||!image||!graph?.edges.length;
   for(const t of travellers){
@@ -225,9 +225,16 @@ function frame(now){
   if(audio.analyser&&playing){const data=new Uint8Array(audio.analyser.fftSize);audio.analyser.getByteTimeDomainData(data);for(let i=0;i<data.length;i++){const x=i/(data.length-1)*scope.width,y=scope.height/2+(data[i]-128)/128*scope.height*.46;i?sx.lineTo(x,y):sx.moveTo(x,y);}}
   else{sx.moveTo(0,scope.height/2);sx.lineTo(scope.width,scope.height/2);}sx.stroke();requestAnimationFrame(frame);
 }
+function startPlayback(){
+  if(finished)restart();playing=true;const s=settings();conversation.reset();lastSpeaker=null;
+  audio.setActiveCount(active().length);audio.setVolume(s.volume*pieceEnvelope(totalTime,s.duration).gain);
+  for(const t of active()){audio.setTraveller(t.id,t.volume,t.pan);t.phrasing.reset();soundEdge(t);}answer();uiState();
+}
 $('play').onclick=async()=>{
-  if(playing){stop();return;}if(!active().length||busy)return;
-  try{await audio.init();if(finished)restart();playing=true;const s=settings();conversation.reset();lastSpeaker=null;audio.setActiveCount(active().length);audio.setVolume(s.volume*pieceEnvelope(totalTime,s.duration).gain);for(const t of active()){audio.setTraveller(t.id,t.volume,t.pan);t.phrasing.reset();soundEdge(t);}answer();uiState();message();}
+  if(playing){stop();return;}
+  if(recordPreparing){cancelRecordingPreparation();uiState();return;}
+  if(!active().length||busy)return;
+  try{await audio.init();startPlayback();message();}
   catch(e){stop();message(`Could not start audio: ${e.message}`);}
 };
 function restart(){audio.silence();conversation.reset();lastSpeaker=null;totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.restart();}if(playing){audio.setVolume(settings().volume*pieceEnvelope(0,settings().duration).gain);for(const t of active())soundEdge(t);answer();}uiState();draw();}
@@ -323,23 +330,30 @@ $('load-score').onchange=async event=>{
 function cancelRecordingPreparation(){recordGeneration++;pendingRecorder?.cancel();pendingRecorder=null;recordPreparing=false;message();}
 function endRecording(){if(!recording)return;recording=false;recordSaving=true;uiState();message('Saving recording…');recorder.stop();}
 $('record').onclick=async()=>{
-  if(recording){endRecording();return;}if(recordPreparing||recordSaving||!playing)return;
-  const generation=++recordGeneration;recordPreparing=true;uiState();message('Preparing recording…');
+  if(recording){endRecording();return;}
+  if(recordPreparing||recordSaving||busy||!active().length||!canRecord())return;
+  const shouldStart=!playing,generation=++recordGeneration;let session;
+  recordPreparing=true;uiState();message('Preparing recording…');
   const reset=()=>{recorder=null;pendingRecorder=null;recordPreparing=false;recordSaving=false;recording=false;uiState();};
-  const session=new MixRecorder(audio.ctx,audio.master,{
-    format:$('record-format').value,
-    onComplete:({blob,extension})=>{
-      if(generation!==recordGeneration)return;reset();
-      download(blob,`filigrana-${new Date().toISOString().slice(0,19).replaceAll(':','-')}.${extension}`);message('Recording saved.');
-    },
-    onError:error=>{if(generation!==recordGeneration)return;reset();message(`Could not save recording: ${error.message}`);},
-    onLimit:()=>{recording=false;recordSaving=true;uiState();message('Saving recording…');}
-  });
-  pendingRecorder=session;
   try{
-    await session.start();if(generation!==recordGeneration||!playing){session.cancel();return;}
-    pendingRecorder=null;recorder=session;recordPreparing=false;recording=true;uiState();message('Recording…');
-  }catch(error){session.cancel();if(generation===recordGeneration){reset();message(`Could not start recording: ${error.message}`);}}
+    await audio.init();if(generation!==recordGeneration)return;
+    session=new MixRecorder(audio.ctx,audio.master,{
+      format:$('record-format').value,
+      onComplete:({blob,extension})=>{
+        if(generation!==recordGeneration)return;reset();
+        download(blob,`filigrana-${new Date().toISOString().slice(0,19).replaceAll(':','-')}.${extension}`);message('Recording saved.');
+      },
+      onError:error=>{if(generation!==recordGeneration)return;reset();message(`Could not save recording: ${error.message}`);},
+      onLimit:()=>{recording=false;recordSaving=true;uiState();message('Saving recording…');}
+    });
+    pendingRecorder=session;await session.start();
+    if(generation!==recordGeneration||busy||!active().length||(!shouldStart&&!playing)){session.cancel();if(generation===recordGeneration)reset();return;}
+    pendingRecorder=null;recorder=session;recordPreparing=false;recording=true;
+    // Capture is connected before the first new note and the musical clock start.
+    if(shouldStart)startPlayback();else uiState();message('Recording…');
+  }catch(error){
+    session?.cancel();if(generation===recordGeneration){if(shouldStart&&playing)stop();reset();message(`Could not start recording: ${error.message}`);}
+  }
 };
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing){stop();message('Paused while this tab was hidden. Press Listen to continue.');}});
 mountTravellers();refreshPalette();applyPreset('floating');updateLabels();requestAnimationFrame(frame);loadImage('drawing.jpg','Example drawing');

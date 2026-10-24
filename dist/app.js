@@ -345,6 +345,9 @@ document.querySelectorAll('.control-group').forEach(group=>group.addEventListene
 document.addEventListener('input',event=>{if(event.target.id!=='preset'&&event.target.matches('input[type=range],select'))customMood();});
 document.addEventListener('change',event=>{if(event.target.id!=='preset'&&event.target.matches('select,#delay-enabled'))customMood();});
 $('analyse').onclick=analyse;
+const drawingSettings=$('drawing-settings');
+document.addEventListener('click',event=>{if(drawingSettings.open&&!drawingSettings.contains(event.target))drawingSettings.open=false;});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&drawingSettings.open){drawingSettings.open=false;drawingSettings.querySelector('summary').focus();}});
 async function asDataURL(blob){
   const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));
   return `data:${blob.type||'image/jpeg'};base64,${btoa(binary)}`;

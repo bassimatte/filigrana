@@ -403,6 +403,21 @@ label:hover output, label:has(+ input[type=range]:is(:focus-visible,:active,:hov
   .transport-status { padding-right: 0; gap: 4px; }
 }
 .voice-button>span.voice-copy { display: block; }
+.drawing-settings-menu { position: relative; flex: 0 0 auto; }
+.drawing-settings-button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 7px 10px; border: 1px solid color-mix(in srgb,var(--line) 75%,transparent); border-radius: 7px; background: transparent; color: var(--ink); font-size: 11px; white-space: nowrap; }
+.drawing-settings-button::-webkit-details-marker { display: none; }
+.drawing-settings-button .ui-icon { width: 15px; height: 15px; }
+.drawing-settings-menu[open] .drawing-settings-button, .drawing-settings-button:hover { border-color: var(--green); }
+.drawing-settings-popover { position: absolute; z-index: 20; top: calc(100% + 8px); right: 0; width: 270px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--field); box-shadow: 0 10px 32px var(--shadow); }
+.drawing-settings-popover label { margin: 0 0 8px; }
+.drawing-settings-popover input[type=range] { margin: 13px 0 16px; }
+.drawing-settings-popover .hint { margin: 0 0 14px; }
+.drawing-settings-popover #analyse { width: 100%; }
 @media(max-width:360px) {
   .theme-switch button { font-size: 0; gap: 0; min-width: 28px; padding: 6px; }
+}
+@media(max-width:700px) {
+  .drawing-toolbar .drawing-actions { flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
+  .drawing-actions select { flex: 1 0 100%; max-width: none; }
+  .drawing-toolbar label.upload { margin: 0; }
 }

@@ -6,7 +6,7 @@
 
 A browser instrument that follows ink in a photograph and weaves gentle generative melodies with three independent travellers. Start with `npm run dev` and open http://127.0.0.1:8437. No installation or API keys are needed.
 
-Press **Listen** to hear the ready-made Floating trio, or choose **Flowing** or **Floating** for another arrangement. Three colored voice buttons sit above the drawing. Tap one to open its instrument, octave, tuning, and expression settings; tap again or use Close to put it away. Each voice has a separate On/Muted button. Drag a colored point on the drawing to set its origin, or select a voice and click a line. Listen, Restart, and Record stay visible while scrolling. **Pace**, **Space**, and **Output** are the main shared controls; **Explore further** holds branching, seed, tuning details, delay, image reading, composition files, and the frequency readout.
+Press **Listen** to hear the ready-made Floating trio, or choose another arrangement from the **Preset** dropdown. Three colored voice buttons sit above the drawing. Tap one to open its instrument, octave, tuning, and expression settings; tap again or use Close to put it away. Each voice has a separate On/Muted button. Drag a colored point on the drawing to set its origin, or select a voice and click a line. Listen, Restart, and Record stay visible while scrolling. **Pace**, **Space**, and **Output** are the main shared controls; **Explore further** holds branching, seed, tuning details, delay, image reading, composition files, and the frequency readout.
 
 Three numbered, colored voices start at different points on the drawing. Each has its own movement state, exploration history, phrase clock, octave shift (−2 to +2), scale selector, and On checkbox in its settings. Turning one off pauses its movement and fades its sound; the others continue. Restart restores all three saved origins. Rebuilding the image resets the origins while preserving octave, tuning, and enabled choices.
 
@@ -20,7 +20,7 @@ Each bell uses multiple sine partials with a rounded attack, a dominant fundamen
 
 Extraction uses an adaptive local luminance threshold, Zhang–Suen thinning, and junction clustering. Ink sensitivity changes the threshold; Rebuild paths applies it. The supplied photo is the default score, and image uploads stay in the browser. Photography, shadows, fine hatching, and physically broken strokes can cause missing or false connections. Paths view lets you inspect that interpretation. No semantic image model or hand-traced substitute is used.
 
-The original bowed and plucked resonances remain available in each traveller's Instrument selector. Each has its own three parallel bandpass resonators. Their inverse-length mapping (`f = referenceHz × 0.12 × imageDiagonal / segmentLength`) also passes through that traveller's tuning and octave choices, within MIDI 28–96 before transposition. Bow excites continuously; Pluck excites at segment transitions. Ring controls filter Q; the spacing control applies to the eight note instruments. All three audio channels feed one output and one recorder. Audio starts only after pressing Listen; it pauses when the page is hidden. Record captures the entire ensemble and effects as WebM, Ogg, or M4A depending on browser support. This is a sonification experiment, not a calibrated physical simulation of an acoustic object.
+The original bowed and plucked resonances remain available in each traveller's Instrument selector. Each has its own three parallel bandpass resonators. Their inverse-length mapping (`f = referenceHz × 0.12 × imageDiagonal / segmentLength`) also passes through that traveller's tuning and octave choices, within MIDI 28–96 before transposition. Bow excites continuously; Pluck excites at segment transitions. Ring controls filter Q; the spacing control applies to the twelve note instruments. All three audio channels feed one output and one recorder. Audio starts only after pressing Listen; it pauses when the page is hidden. Record captures the entire ensemble and effects as WebM, Ogg, or M4A depending on browser support. This is a sonification experiment, not a calibrated physical simulation of an acoustic object.
 
 `npm test` verifies network topology, loop and endpoint handling, independent traversal and origins, inverse-length tuning, scale membership, exact octave ratios, continuous free pitches, resolution invariance, phrase grouping, and curve response. Audio graph tests verify simultaneous strikes and per-traveller voice limits and muting; browser QA separately checks actual playback and recording. The app is buildless: `dist/` is the complete static site.
 
@@ -32,7 +32,7 @@ Each traveller now has an Instrument selector: felt bell, felt piano, nylon harp
 
 Room and delay now receive all instruments. The delay has an On bypass, 100–1800 ms time, 0–65% feedback, and 0–50% wet mix, defaulting to 650 ms / 28% / 18%. A lowpass in the feedback loop darkens successive echoes. Send, feedback, and return fade down on bypass. Feedback is bounded below unity, parameter changes are smoothed, and the effects feed the same compensated, compressed, limited output as the dry voices. Recording includes the whole mix.
 
-`test/audio-render.html`, served alongside `dist/` from the project root, runs real OfflineAudioContext rendering checks: audible finite output without clipping for all eight note voices, fading delay repeats, delay bypass, stereo placement, and zero-volume silence. It is a development fixture and is excluded from the published static directory. `Resonator.init(context)` accepts an OfflineAudioContext for audio rendering checks; normal playback still creates an AudioContext after Listen.
+`test/audio-render.html`, served alongside `dist/` from the project root, runs real OfflineAudioContext rendering checks: audible finite output without clipping for all twelve note voices, fading delay repeats, delay bypass, stereo placement, and zero-volume silence. It is a development fixture and is excluded from the published static directory. `Resonator.init(context)` accepts an OfflineAudioContext for audio rendering checks; normal playback still creates an AudioContext after Listen.
 
 ## Expression, conversation, and compositions
 
@@ -44,7 +44,7 @@ Choose an open-ended piece or a 2-, 5-, or 10-minute performance. Timed pieces s
 
 **Save composition** downloads a `.line-score.json` file containing the original embedded image, extraction sensitivity, exact origins, instrument and tuning choices, expression settings, effects, performance length, interaction, and seed. **Load composition** restores those settings locally without starting audio. Images are embedded rather than linked to remote URLs. Imported numeric controls are bounded, enum choices are validated, and incompatible files are rejected. If image decoding changes graph indices across browsers, origins fall back to the nearest saved image coordinates.
 
-The rendering fixture now includes stereo and zero-volume checks, in addition to the eight instruments and delay tests. Performance tests cover conversation fairness and spacing, the ending envelope, independent speeds, repeatable seeded routes, and composition validation/round trips. Live browser visual QA depends on the browser connection; the latest update was checked with controller smoke tests and offline Web Audio rendering when that connection was unavailable.
+The rendering fixture now includes stereo and zero-volume checks, in addition to the twelve instruments and delay tests. Performance tests cover conversation fairness and spacing, the ending envelope, independent speeds, repeatable seeded routes, and composition validation/round trips. Live browser visual QA depends on the browser connection; the latest update was checked with controller smoke tests and offline Web Audio rendering when that connection was unavailable.
 
 ## Sound-quality refinement
 
@@ -81,3 +81,22 @@ The felt bell now combines a rounded strike with quieter inharmonic modes and a 
 Upper modes end as they become inaudible, with a brief fade to zero; cleanup follows the longest-ringing oscillator. Additional rendering checks cover the refined trio together at both ends of its register with maximum output and long effects. The interface and saved-composition format are unchanged.
 
 The opening screen keeps only the title, controls, one placement hint, and an upload privacy note. Routine readiness and voice-change messages are silent; errors, loading, recording, and file confirmations still appear. Moods change the instruments and sound balance while preserving the chosen interaction and branching rules.
+
+## Preset dropdown and new voices
+
+Each voice now offers 14 instruments, including glass harmonica, handpan, bass clarinet, and muted vibraphone. Glass uses a slow, noiseless onset, paired overtones, and a gentle swell. Handpan combines tuned metallic modes with a soft hand-strike texture. Bass clarinet emphasizes odd harmonics with breath and a sustained woody body. Muted vibraphone uses damped bar modes and a gentle volume tremolo. These are synthesized interpretations.
+
+| Preset | Voices |
+| --- | --- |
+| Floating (default) | Flute · strings · felt bell |
+| Still | Bowl · piano · harp |
+| Flowing | Piano · harp · kalimba |
+| Glass garden | Glass harmonica · harp · vibraphone |
+| Moonwater | Handpan · bowl · glass harmonica |
+| Woodland | Bass clarinet · marimba · kalimba |
+| Soft focus | Piano · vibraphone · strings |
+| Lanterns | Handpan · harp · felt bell |
+| Dusk | Bass clarinet · glass harmonica · bowl |
+| Crystal room | Glass harmonica · vibraphone · felt bell |
+
+Presets set instruments, octaves, individual expression, pace, space, decay, and response gap. They preserve starting points, enabled/muted voices, interaction, branching, journey seed, root, overall output, duration, and delay. The dropdown shows Custom for edited arrangements and recognizes matching presets when compositions are loaded. Existing composition files remain compatible.

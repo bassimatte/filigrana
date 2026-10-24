@@ -1,4 +1,4 @@
-import {INSTRUMENTS} from './instruments.js';
+import {INSTRUMENTS} from './instruments.js?v=6';
 import {SCALES} from './music.js';
 const number=(v,min,max,fallback)=>Number.isFinite(v)?Math.max(min,Math.min(max,v)):fallback;
 export const CONTROL_LIMITS={speed:[25,200,100],tuning:[55,660,196],q:[3,65,42],volume:[0,100,35],sensitivity:[10,95,55],room:[0,70,32],'delay-time':[100,1800,650],'delay-feedback':[0,65,28],'delay-mix':[0,50,18],'response-gap':[.8,6,2.4]};

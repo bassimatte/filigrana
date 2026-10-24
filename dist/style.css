@@ -134,14 +134,6 @@ h1 { font-size: clamp(34px,3.4vw,48px); line-height: 1.08; }
 #message { min-height: 0; font-size: 10px; margin-bottom: 0; }
 .listening-panel { padding-left: 26px; }
 .listening-panel>.eyebrow { margin: 4px 0 23px; }
-.moods h2 { margin-bottom: 15px; font-size: 25px; }
-.mood-options { display: grid; gap: 7px; }
-.mood-options button { padding: 12px 14px; text-align: left; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 9px; }
-.mood-options button[aria-pressed=true] { border-color: var(--green); background: var(--selected); box-shadow: inset 3px 0 var(--green); }
-.mood-options button:hover { border-color: var(--green); }
-.mood-options strong { display: block; font: 21px 'Instrument Serif',Georgia,serif; font-weight: 400; }
-.mood-options span { display: block; font-size: 10px; color: var(--muted); margin-top: 4px; }
-#mood-description { min-height: 38px; }
 .simple-controls { border-bottom: 0; }
 .simple-controls h2 { font-size: 25px; }
 .advanced { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 18px 0; }
@@ -196,11 +188,6 @@ footer { padding-top: 18px; padding-bottom: 18px; }
   .canvas-note { left: 10px; bottom: 8px; font-size: 9px; padding: 5px 7px; }
   .listening-panel { border-left: 0; padding: 25px 0 0; margin-top: 25px; border-top: 1px solid var(--line); }
   .listening-panel>.eyebrow { display: none; }
-  .mood-options { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
-  .mood-options button { padding: 10px; }
-  .mood-options strong { font-size: 22px; }
-  .mood-options span { font-size: 9px; line-height: 1.6; }
-  #mood-description { min-height: 0; }
   .transport { padding: 12px 5vw max(12px,env(safe-area-inset-bottom)); gap: 7px; }
   .transport button { font-size: 11px; padding: 10px; min-width: 0; }
   .transport button.play { min-width: 100px; }
@@ -209,8 +196,11 @@ footer { padding-top: 18px; padding-bottom: 18px; }
 }
 
 /* Keep the opening screen quiet; status text appears only when needed. */
-.listening-panel .moods { padding-top: 2px; }
 .upload-privacy { margin: -2px 0 12px; text-align: right; color: var(--muted); font-size: 10px; }
 .drawing-caption { justify-content: flex-start; }
 footer { justify-content: flex-end; }
 @media(max-width:700px) { .upload-privacy { text-align: left; } }
+
+.presets { padding: 0 0 4px; }
+.presets label { margin: 0 0 9px; }
+.presets select { font-size: 13px; padding: 12px; }

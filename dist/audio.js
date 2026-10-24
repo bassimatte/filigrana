@@ -1,5 +1,5 @@
-import {delaySettings} from './instruments.js?v=4';
-import {notePlan,toneCutoff,limiterCurve,roomImpulse} from './synthesis.js?v=4';
+import {delaySettings} from './instruments.js?v=6';
+import {notePlan,toneCutoff,limiterCurve,roomImpulse} from './synthesis.js?v=6';
 export class Resonator {
   async init(context=null) {
     if(this.ctx){if(!this.ctx.startRendering)await this.ctx.resume();return;}
@@ -73,10 +73,19 @@ export class Resonator {
     voice.filter.frequency.exponentialRampToValueAtTime(toneCutoff(hz,voice.brightness,tail*.75,tail,bend),t+tail*.75);
     voice.pan=c.createStereoPanner();voice.pan.pan.value=Math.max(-.35,Math.min(.35,pan));
     voice.envelope=c.createGain();voice.envelope.gain.value=1;
+    let toneOutput=voice.envelope;
+    if(profile.tremolo){
+      // A separate positive-only gain keeps tremolo out of release/voice-stealing fades.
+      const pulse=c.createGain(),lfo=c.createOscillator(),depth=c.createGain(),amount=Math.max(0,Math.min(.3,profile.tremolo.depth)),settle=t+attack+.8;
+      pulse.gain.setValueAtTime(1,t);pulse.gain.linearRampToValueAtTime(1-amount,settle);
+      depth.gain.setValueAtTime(0,t);depth.gain.linearRampToValueAtTime(amount,settle);lfo.frequency.value=profile.tremolo.rate;
+      lfo.connect(depth);depth.connect(pulse.gain);pulse.connect(voice.envelope);toneOutput=pulse;
+      lfo.start(t);lfo.stop(t+tail+.1);voice.modulators.push(lfo);voice.gains.push(depth);voice.nodes.push(pulse);
+    }
     if(profile.lowCut){
       const bodyCut=c.createBiquadFilter();bodyCut.type='highpass';bodyCut.frequency.value=Math.min(profile.lowCut,hz*.42);bodyCut.Q.value=.55;
-      voice.filter.connect(bodyCut);bodyCut.connect(voice.envelope);voice.nodes.push(bodyCut);
-    }else voice.filter.connect(voice.envelope);
+      voice.filter.connect(bodyCut);bodyCut.connect(toneOutput);voice.nodes.push(bodyCut);
+    }else voice.filter.connect(toneOutput);
     voice.envelope.connect(voice.pan);voice.pan.connect(channel.noteLevel||this.bells);
     let lastOscillator=null,lastEnd=0;
     for(const part of plan.partials){

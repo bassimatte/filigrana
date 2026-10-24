@@ -1,4 +1,4 @@
-import {instrument} from './instruments.js?v=4';
+import {instrument} from './instruments.js?v=6';
 import {bellDecay} from './music.js';
 import {seededRandom} from './performance.js';
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));

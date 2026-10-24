@@ -1,10 +1,11 @@
+import {PRESETS,matchingPreset} from './presets.js?v=6';
 import {inkMask,thin,graphFromSkeleton,resonance,chooseEdge,pointOnEdge} from './geometry.js';
-import {Resonator} from './audio.js?v=4';
+import {Resonator} from './audio.js?v=6';
 import {bellPitch,bellDecay,curvature,noteName,tunePitch,SCALES} from './music.js';
 import {Traveller,defaultStarts} from './traveller.js';
-import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=4';
+import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=6';
 import {Conversation,pieceEnvelope} from './performance.js';
-import {CONTROL_LIMITS,validateComposition} from './composition.js';
+import {CONTROL_LIMITS,validateComposition} from './composition.js?v=6';
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
 let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,photo=true,paths=true,lastTime=0,totalTime=0,loadId=0,maskLayer=null,downloadURL=null,finished=false,lastSpeaker=null;
@@ -253,24 +254,20 @@ for(const [id,unit] of [['speed','%'],['tuning',' Hz'],['q',''],['volume','%'],[
 $('delay-enabled').onchange=()=>{updateLabels();updateEffects();};
 $('interaction').onchange=()=>{audio.silence();conversation.reset();lastSpeaker=null;updateLabels();if(playing){audio.setVolume(settings().volume*pieceEnvelope(totalTime,settings().duration).gain);for(const t of active()){t.phrasing.reset();soundEdge(t);}answer();}};
 $('seed').onchange=()=>message('The new journey seed will apply when you press Restart.');
-const MOODS={
-  still:{keys:['bowl','piano','harp'],octaves:[-1,0,1],speeds:[18,28,40],spacing:[4.5,3,2],volumes:[.65,.8,.55],room:32,ring:42,pace:100,gap:2.4,description:'Slow voices, soft notes, and room to breathe.'},
-  flowing:{keys:['piano','harp','kalimba'],octaves:[0,0,1],speeds:[30,40,48],spacing:[2.8,2.2,3],volumes:[.7,.6,.5],room:24,ring:32,pace:110,gap:1.6,description:'Interwoven piano, harp, and light wooden notes.'},
-  floating:{keys:['flute','strings','bell'],octaves:[0,-1,1],speeds:[18,16,26],spacing:[5,6,4],volumes:[.65,.55,.45],room:48,ring:48,pace:85,gap:3.6,description:'Airy flute, soft strings, and distant bells.'}
-};
-function applyMood(key){
-  const mood=MOODS[key];audio.silence();conversation.reset();lastSpeaker=null;
+function applyPreset(key){
+  const mood=PRESETS[key];audio.silence();conversation.reset();lastSpeaker=null;
   for(const t of travellers){t.instrument=mood.keys[t.id];t.octave=mood.octaves[t.id];t.speed=mood.speeds[t.id];t.spacing=mood.spacing[t.id];t.volume=mood.volumes[t.id];t.pan=(t.id-1)*.4;t.scale='pentatonic';t.phrasing.reset();t.heardPitch=null;syncTraveller(t);audio.setTraveller(t.id,t.volume,t.pan);}
   for(const [id,value,unit]of [['room',mood.room,'%'],['q',mood.ring,''],['speed',mood.pace,'%'],['response-gap',mood.gap,' s']]){$(id).value=value;$(`${id}-value`).textContent=value+unit;}
-  document.querySelectorAll('[data-mood]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.mood===key)));
+  $('preset').value=key;
   updateEffects();updateLabels();voiceOverview();
   if(playing){audio.setVolume(settings().volume*pieceEnvelope(totalTime,settings().duration).gain);for(const t of active())soundEdge(t);answer();}draw();
 }
-function customMood(){document.querySelectorAll('[data-mood]').forEach(button=>button.setAttribute('aria-pressed','false'));}
-for(const button of document.querySelectorAll('[data-mood]'))button.onclick=()=>{applyMood(button.dataset.mood);message();};
-$('calm-trio').onclick=()=>{applyMood('still');message();};
-document.addEventListener('input',event=>{if(event.target.matches('input[type=range],select'))customMood();});
-document.addEventListener('change',event=>{if(event.target.matches('select,#delay-enabled'))customMood();});
+function customMood(){$('preset').value=matchingPreset(travellers,{room:+$('room').value,ring:+$('q').value,pace:+$('speed').value,gap:+$('response-gap').value});}
+$('preset').innerHTML=Object.entries(PRESETS).map(([key,p])=>`<option value="${key}">${p.name}</option>`).join('')+'<option value="custom" disabled>Custom</option>';
+$('preset').onchange=()=>{if(Object.hasOwn(PRESETS,$('preset').value)){applyPreset($('preset').value);message();}};
+$('calm-trio').onclick=()=>{applyPreset('still');message();};
+document.addEventListener('input',event=>{if(event.target.id!=='preset'&&event.target.matches('input[type=range],select'))customMood();});
+document.addEventListener('change',event=>{if(event.target.id!=='preset'&&event.target.matches('select,#delay-enabled'))customMood();});
 $('analyse').onclick=analyse;
 async function asDataURL(blob){
   const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));
@@ -321,4 +318,4 @@ $('record').onclick=()=>{
   catch(e){message(e.message);}
 };
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing){stop();message('Paused while this tab was hidden. Press Listen to continue.');}});
-mountTravellers();refreshPalette();applyMood('floating');updateLabels();requestAnimationFrame(frame);loadImage('drawing.jpg','Example drawing');
+mountTravellers();refreshPalette();applyPreset('floating');updateLabels();requestAnimationFrame(frame);loadImage('drawing.jpg','Example drawing');

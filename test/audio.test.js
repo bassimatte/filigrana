@@ -21,13 +21,13 @@ test('polyphony and muting are owned by each traveller',()=>{
   assert.equal(a.voices.filter(v=>v.travellerId===0&&!v.released).length,4);
   assert.equal(a.voices.filter(v=>v.travellerId===2&&!v.released).length,4);
 });
-test('all eight note instruments create playable, releasable voices, including breath and vibrato',()=>{
+test('all note instruments create playable, releasable voices, including breath and vibrato',()=>{
   const a=engine();let time=0;
   for(const [key,profile] of Object.entries(INSTRUMENTS)){
     if(profile.continuous)continue;a.ctx.currentTime=time++;
     assert.equal(a.strike(220,42,0,.3,0,key),true);const v=a.channels[0].currentVoice;
     assert.equal(v.instrument,key);assert.ok(v.oscillators.length>=3);assert.ok(v.oscillators.every(o=>Number.isFinite(o.frequency.value)));
-    if(profile.vibrato||profile.breath)assert.ok(v.modulators.length>0);
+    if(profile.vibrato||profile.breath||profile.tremolo)assert.ok(v.modulators.length>0);
     a.colour(.5,0);a.releaseVoice(v);assert.equal(v.released,true);
   }
 });

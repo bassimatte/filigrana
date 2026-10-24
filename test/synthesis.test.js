@@ -15,7 +15,7 @@ test('high modes are removed rather than collapsed into a single high-frequency 
   assert.ok(plan.partials.every(p=>p.frequency<22050*.42));assert.equal(plan.partials.length,1);
 });
 test('sustained instruments have a fuller body than plucked instruments',()=>{
-  for(const key of ['flute','strings']){const p=notePlan(220,42,key);assert.ok(p.partials[0].bodyLevel>.65);assert.ok(p.partials[0].bodyTime>p.tail*.4);}
+  for(const key of ['flute','strings','glass','bassclarinet']){const p=notePlan(220,42,key);assert.ok(p.partials[0].bodyLevel>.65);assert.ok(p.partials[0].bodyTime>p.tail*.4);}
   for(const key of ['piano','harp','kalimba','marimba'])assert.ok(notePlan(220,42,key).partials[0].bodyLevel<.25);
 });
 test('note variation is reproducible, bounded, and does not shift nominal modal frequencies',()=>{

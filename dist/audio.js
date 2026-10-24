@@ -1,5 +1,5 @@
-import {delaySettings} from './instruments.js';
-import {notePlan,toneCutoff,limiterCurve,roomImpulse} from './synthesis.js';
+import {delaySettings} from './instruments.js?v=4';
+import {notePlan,toneCutoff,limiterCurve,roomImpulse} from './synthesis.js?v=4';
 export class Resonator {
   async init(context=null) {
     if(this.ctx){if(!this.ctx.startRendering)await this.ctx.resume();return;}
@@ -73,11 +73,16 @@ export class Resonator {
     voice.filter.frequency.exponentialRampToValueAtTime(toneCutoff(hz,voice.brightness,tail*.75,tail,bend),t+tail*.75);
     voice.pan=c.createStereoPanner();voice.pan.pan.value=Math.max(-.35,Math.min(.35,pan));
     voice.envelope=c.createGain();voice.envelope.gain.value=1;
-    voice.filter.connect(voice.envelope);voice.envelope.connect(voice.pan);voice.pan.connect(channel.noteLevel||this.bells);
+    if(profile.lowCut){
+      const bodyCut=c.createBiquadFilter();bodyCut.type='highpass';bodyCut.frequency.value=Math.min(profile.lowCut,hz*.42);bodyCut.Q.value=.55;
+      voice.filter.connect(bodyCut);bodyCut.connect(voice.envelope);voice.nodes.push(bodyCut);
+    }else voice.filter.connect(voice.envelope);
+    voice.envelope.connect(voice.pan);voice.pan.connect(channel.noteLevel||this.bells);
+    let lastOscillator=null,lastEnd=0;
     for(const part of plan.partials){
       const o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.value=part.frequency;o.detune.value=part.detune;
-      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(part.level,t+attack);g.gain.exponentialRampToValueAtTime(Math.max(.000001,part.level*part.bodyLevel),t+part.bodyTime);g.gain.exponentialRampToValueAtTime(.000001,t+part.end);
-      o.connect(g);g.connect(voice.filter);o.start(t);o.stop(t+tail+.1);voice.oscillators.push(o);voice.gains.push(g);
+      g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(part.level,t+part.attack);g.gain.exponentialRampToValueAtTime(Math.max(.000001,part.level*part.bodyLevel),t+part.bodyTime);g.gain.exponentialRampToValueAtTime(.000001,t+part.end);g.gain.linearRampToValueAtTime(0,t+part.end+.025);
+      o.connect(g);g.connect(voice.filter);o.start(t);o.stop(t+part.end+.03);voice.oscillators.push(o);voice.gains.push(g);if(part.end>lastEnd){lastEnd=part.end;lastOscillator=o;}
     }
     if(profile.vibrato){
       const lfo=c.createOscillator(),depth=c.createGain();lfo.frequency.value=plan.vibratoRate;depth.gain.setValueAtTime(0,t);depth.gain.setValueAtTime(0,t+attack+.15);depth.gain.linearRampToValueAtTime(profile.vibrato,t+attack+1.1);
@@ -87,15 +92,16 @@ export class Resonator {
     }
     if(profile.breath||profile.transient){
       const breath=c.createBufferSource(),g=c.createGain();breath.buffer=this.noise.buffer;breath.loop=true;
-      const air=c.createBiquadFilter();air.type='bandpass';air.frequency.value=profile.breath?Math.min(2600,Math.max(950,hz*4)):Math.min(1600,Math.max(250,hz*2));air.Q.value=profile.breath?.75:1.2;
-      const duration=profile.breath?tail:.065,peak=profile.breath||profile.transient,rise=profile.breath?attack:.009;
+      const air=c.createBiquadFilter();air.type='bandpass';air.frequency.value=profile.breath?Math.min(2600,Math.max(950,hz*4)):Math.min(1600,Math.max(250,hz*2));air.Q.value=profile.breath?.75:(profile.transientQ||1.2);
+      if(!profile.breath&&profile.transientFrequency)air.frequency.value=Math.min(1900,profile.transientFrequency*(hz/220)**.18);
+      const duration=profile.breath?tail:(profile.transientTime||.065),peak=profile.breath||profile.transient,rise=profile.breath?attack:.009;
       g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(peak,t+rise);
       if(profile.breath)g.gain.exponentialRampToValueAtTime(peak*.6,t+tail*.45);
       g.gain.exponentialRampToValueAtTime(.000001,t+duration);
       breath.connect(air);air.connect(g);g.connect(voice.envelope);breath.start(t,plan.variation*.7);breath.stop(t+duration+.1);voice.modulators.push(breath);voice.gains.push(g);voice.nodes.push(air);
     }
     voice.hz=hz;this.voices.push(voice);channel.currentVoice=voice;
-    voice.oscillators[0].onended=()=>{voice.released=true;for(const o of [...voice.oscillators,...voice.modulators])o.disconnect();for(const g of voice.gains)g.disconnect();for(const node of voice.nodes)node.disconnect();voice.filter.disconnect();voice.envelope.disconnect();voice.pan.disconnect();this.voices=this.voices.filter(v=>v!==voice);};
+    lastOscillator.onended=()=>{voice.released=true;for(const o of [...voice.oscillators,...voice.modulators])o.disconnect();for(const g of voice.gains)g.disconnect();for(const node of voice.nodes)node.disconnect();voice.filter.disconnect();voice.envelope.disconnect();voice.pan.disconnect();this.voices=this.voices.filter(v=>v!==voice);};
     return true;
   }
   colour(bend,travellerId=0){const v=this.channels?.[travellerId]?.currentVoice;if(this.ctx&&v&&!v.released){const t=this.ctx.currentTime;v.filter.frequency.cancelScheduledValues(t);v.filter.frequency.setTargetAtTime(toneCutoff(v.hz,v.brightness,t-v.started,v.tail,bend),t,.25);}}

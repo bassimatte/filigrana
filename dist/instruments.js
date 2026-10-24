@@ -1,12 +1,12 @@
 // Synthesized acoustic-inspired voices; no remote samples or audio downloads.
 // Each partial is [frequency ratio, peak gain, relative decay].
 export const INSTRUMENTS={
-  bell:{label:'Felt bell',attack:.032,tail:1,brightness:3.8,body:.24,bodyLevel:.2,gain:.96,partials:[[1,.56,1],[2,.12,.66],[2.76,.045,.4],[4.07,.015,.24],[5.43,.005,.16]]},
-  piano:{label:'Felt piano',attack:.018,tail:.72,brightness:5.5,spacing:1.1,body:.2,bodyLevel:.16,transient:.009,unison:1.6,partials:[[1,.43,1],[2,.19,.75],[3.002,.10,.56],[4.009,.055,.4],[5.02,.028,.29],[6.035,.014,.21],[7.05,.008,.16],[8.07,.004,.12]]},
+  bell:{label:'Felt bell',attack:.026,tail:1.04,brightness:5.8,body:.19,bodyLevel:.19,gain:1.1,registerGain:.12,upperDamping:.14,modeAttack:.28,lowCut:42,transient:.007,transientTime:.045,transientFrequency:1250,transientQ:.65,pairs:[{mode:2,beatHz:.65,mix:.14}],partials:[[1,.52,1],[2.012,.085,.68],[2.756,.067,.48],[4.07,.025,.29],[5.43,.012,.2],[7.98,.0035,.13]]},
+  piano:{label:'Felt piano',attack:.012,tail:.82,brightness:7.2,spacing:1.1,body:.16,bodyLevel:.19,gain:1.02,registerGain:.1,upperDamping:.2,modeAttack:.18,stiffness:.00012,lowCut:38,transient:.023,transientTime:.055,transientFrequency:880,transientQ:.7,unison:1.25,partials:[[1,.43,1],[2,.21,.8],[3,.13,.64],[4,.075,.49],[5,.043,.38],[6,.025,.3],[7,.014,.24],[8,.008,.19],[9,.0045,.16],[10,.0025,.13],[11,.0014,.11],[12,.0008,.09]]},
   harp:{label:'Nylon harp',attack:.015,tail:.8,brightness:6.5,body:.22,bodyLevel:.18,transient:.005,partials:[[1,.47,1],[2,.20,.76],[3,.095,.56],[4,.044,.39],[5,.021,.28],[6,.01,.21],[7,.005,.16],[8,.0025,.12]]},
   kalimba:{label:'Wooden kalimba',attack:.014,tail:.38,brightness:5.8,body:.2,bodyLevel:.15,transient:.006,partials:[[1,.50,1],[2.76,.13,.5],[5.4,.035,.26],[8.93,.008,.15]]},
   marimba:{label:'Low marimba',attack:.018,tail:.32,brightness:5.5,body:.18,bodyLevel:.13,transient:.006,partials:[[1,.60,1],[3.99,.14,.35],[10.65,.018,.15],[17.92,.003,.1]]},
-  bowl:{label:'Singing bowl',attack:.28,tail:1.6,brightness:6.5,spacing:2,body:.4,bodyLevel:.36,gain:.86,partials:[[1,.36,1],[1.0022,.09,.96],[2.71,.16,.77],[5.19,.05,.54],[8.21,.014,.32]]},
+  bowl:{label:'Singing bowl',attack:.095,tail:1.5,brightness:7,spacing:2,body:.34,bodyLevel:.4,gain:1.15,registerGain:.22,upperDamping:.1,modeAttack:.55,lowCut:48,transient:.004,transientTime:.075,transientFrequency:700,transientQ:.7,pairs:[{mode:0,beatHz:.28,mix:.22},{mode:1,beatHz:.63,mix:.3},{mode:2,beatHz:1.07,mix:.24},{mode:3,beatHz:1.58,mix:.18}],partials:[[1,.33,1],[2.71,.19,.84],[5.19,.065,.62],[8.21,.022,.43],[11.3,.006,.28]]},
   flute:{label:'Breathy flute',attack:.32,tail:.78,brightness:3.7,spacing:1.4,sustain:true,body:.48,bodyLevel:.75,gain:.65,breath:.018,vibrato:3.5,partials:[[1,.45,1],[2,.10,.94],[3,.032,.86],[4,.009,.72]]},
   strings:{label:'Soft bowed strings',attack:.65,tail:1.1,brightness:4.7,spacing:1.6,sustain:true,body:.52,bodyLevel:.72,gain:.68,unison:3.2,vibrato:4.5,partials:[[1,.34,1],[2,.17,.96],[3,.085,.9],[4,.045,.83],[5,.025,.76],[6,.014,.7],[7,.008,.62],[8,.004,.55]]},
   bow:{label:'Bowed resonance',continuous:true},

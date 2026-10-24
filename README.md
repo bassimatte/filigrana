@@ -73,3 +73,9 @@ Choose **Light**, **Dark**, or **Auto** in the header. Auto follows the device a
 ## Simpler listening interface
 
 The drawing and voice buttons are visible first. No voice settings or advanced panels open by default. Still, Flowing, and Floating offer complete starting arrangements; editing musical controls marks the arrangement as custom. Appearance remains independent. The fixed playback bar includes recording, whose Save recording action downloads the whole mix. The drawing accepts mouse, pen, and touch point dragging, with select-and-click placement retained. Parameters, graph extraction, composition format, and synthesis remain compatible with earlier versions.
+
+## Felt bell, piano, and bowl refinement
+
+The felt bell now combines a rounded strike with quieter inharmonic modes and a subtle beating overtone. The piano uses register-dependent string stiffness, unequal detuned string layers, a short filtered hammer texture, and faster high-mode decay. The singing bowl uses several unequal mode pairs with slow, different beating rates, a soft articulated onset, and restrained bass. The three profiles also vary their upper-mode attack and brightness slightly with touch and register. These remain synthesized voices, not sampled acoustic recordings.
+
+Upper modes end as they become inaudible, with a brief fade to zero; cleanup follows the longest-ringing oscillator. Additional rendering checks cover the refined trio together at both ends of its register with maximum output and long effects. The interface and saved-composition format are unchanged.

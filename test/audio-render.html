@@ -35,6 +35,14 @@ try{
     for(let ch=0;ch<2;ch++)for(const v of output.getChannelData(ch)){finite&&=Number.isFinite(v);peak=Math.max(peak,Math.abs(v));}
     report(highRegister?'High-register modes stay finite under dense playback':'Dense voices and long effect tails keep headroom',finite&&peak>.001&&peak<.81,`peak ${peak.toFixed(5)}`);
   }
+  // The three refined voices together, including their lowest playable octave.
+  for(const highRegister of [false,true]){
+    const rate=44100,c=new ScheduledContext(2,rate*9,rate),a=new Resonator();await a.init(c);a.setActiveCount(3);a.setVolume(1);a.setRoom(.7);a.setDelay(.35,.5,.65,true);
+    for(let n=0;n<7;n++){c.renderTime=n*.8;for(const [id,key]of ['bell','piano','bowl'].entries()){a.setTraveller(id,1,(id-1)*.6);a.strike((highRegister?1568:32.7)*[1,1.25,1.5][id],65,0,.5,id,key);}}
+    const output=await c.startRendering();let peak=0,finite=true;
+    for(let ch=0;ch<2;ch++)for(const v of output.getChannelData(ch)){finite&&=Number.isFinite(v);peak=Math.max(peak,Math.abs(v));}
+    report(highRegister?'Refined trio retains headroom in its upper register':'Refined trio retains headroom in its lowest octave',finite&&peak>.001&&peak<.81,`peak ${peak.toFixed(5)}`);
+  }
   status.textContent=failures?`${failures} rendering checks failed`:`All ${checks} rendering checks passed`;
 }catch(error){status.textContent=`Render error: ${error.message}`;console.error(error);}
 </script></body></html>

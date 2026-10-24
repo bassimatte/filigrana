@@ -1,4 +1,4 @@
-import {instrument} from './instruments.js';
+import {instrument} from './instruments.js?v=4';
 import {bellDecay} from './music.js';
 import {seededRandom} from './performance.js';
 const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
@@ -7,15 +7,26 @@ export function notePlan(hz,ring,key,sequence=0,sampleRate=48000){
   const tail=clamp(bellDecay(ring)*(profile.tail||1)*clamp((220/hz)**.16,.72,1.35),.35,22);
   const attack=Math.min((profile.attack||.03)*(.94+.12*variation),tail*.2),partials=[];
   for(let i=0;i<(profile.partials||[]).length;i++){
-    const [ratio,level,decay]=profile.partials[i],frequency=hz*ratio;
+    const [ratio,level,decay]=profile.partials[i];
+    // Piano string stiffness rises with harmonic number, keeping its root exact.
+    const stiffness=(profile.stiffness||0)*clamp((hz/220)**.45,.55,1.8);
+    const frequency=hz*ratio*Math.sqrt((1+stiffness*ratio*ratio)/(1+stiffness));
     // Drop out-of-band modes; clamping several modes to one frequency whistles.
     if(frequency>=sampleRate*.42)continue;
     const rolloff=clamp((sampleRate*.42-frequency)/(sampleRate*.1),0,1),end=Math.max(attack+.08,tail*decay);
-    const peak=level*(profile.gain||1)*(.94+.1*variation)*rolloff;
+    const register=profile.registerGain?clamp((hz/220)**profile.registerGain,.7,1.12):1;
+    const upper=profile.upperDamping?clamp((220/hz)**(profile.upperDamping*Math.min(i,6)),.35,1.15):1;
+    const touch=profile.modeAttack?1+(variation-.5)*.12*Math.min(i/3,1):1;
+    const peak=level*(profile.gain||1)*(.94+.1*variation)*rolloff*register*upper*touch;
     const bodyTime=Math.max(attack+.025,end*(profile.body||.22)),bodyLevel=profile.bodyLevel||.18;
-    const part={frequency,level:peak,end,bodyTime:Math.min(end-.025,bodyTime),bodyLevel,detune:0};
-    if(profile.unison&&i<3){
-      partials.push({...part,level:peak*.7,detune:-profile.unison},{...part,level:peak*.42,detune:profile.unison});
+    const part={frequency,level:peak,end,bodyTime:Math.min(end-.025,bodyTime),bodyLevel,attack:attack*(1-(profile.modeAttack||0)*Math.min(i/3,1)),detune:0};
+    const pair=profile.pairs?.find(pair=>pair.mode===i);
+    if(pair&&frequency+pair.beatHz<sampleRate*.42){
+      // Quiet unequal mode pairs ring without the complete cancellations of equal pairs.
+      partials.push({...part,level:peak*(1-pair.mix)},{...part,frequency:frequency+pair.beatHz,level:peak*pair.mix,end:end*.97,bodyTime:Math.min(part.bodyTime,end*.97-.025)});
+    }else if(profile.unison&&i<3){
+      const refined=!!profile.stiffness;
+      partials.push({...part,level:peak*(refined?.66:.7),detune:-profile.unison},{...part,level:peak*(refined?.34:.42),detune:profile.unison});
     }else partials.push(part);
   }
   return {profile,tail,attack,partials,variation,vibratoRate:4.8+(random()-.5)*.55,cutoff:clamp(hz*(profile.brightness||4),300,6000)};

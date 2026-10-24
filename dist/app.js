@@ -1,8 +1,8 @@
 import {inkMask,thin,graphFromSkeleton,resonance,chooseEdge,pointOnEdge} from './geometry.js';
-import {Resonator} from './audio.js';
+import {Resonator} from './audio.js?v=4';
 import {bellPitch,bellDecay,curvature,noteName,tunePitch,SCALES} from './music.js';
 import {Traveller,defaultStarts} from './traveller.js';
-import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js';
+import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=4';
 import {Conversation,pieceEnvelope} from './performance.js';
 import {CONTROL_LIMITS,validateComposition} from './composition.js';
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');

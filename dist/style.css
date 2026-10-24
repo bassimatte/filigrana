@@ -226,3 +226,7 @@ footer { justify-content: flex-end; }
 .canvas-wrap.path-only #drawing.zoomed { cursor: grab; }
 .encoder-credits { display: inline-block; margin-top: 18px; font-size: 9px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
 @media(max-width:700px) { .header-tools { gap: 8px; } .settings-menu>summary { width: 32px; height: 32px; } }
+
+/* The viewport fills the drawing panel; the camera fits and zooms the vector drawing. */
+.canvas-wrap #drawing { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; object-fit: fill; box-shadow: none; }
+.canvas-wrap #drawing.panning { cursor: grabbing; }

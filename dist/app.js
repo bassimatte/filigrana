@@ -1,3 +1,4 @@
+import {DrawingView} from './drawing-view.js?v=12';
 import {PlaybackClock} from './playback-clock.js?v=9';
 import {MixRecorder,canRecord} from './recorder.js?v=7';
 import {PRESETS,matchingPreset} from './presets.js?v=6';
@@ -10,8 +11,9 @@ import {Conversation,pieceEnvelope} from './performance.js';
 import {CONTROL_LIMITS,validateComposition} from './composition.js?v=6';
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
-let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,visualMode='trace',totalTime=0,loadId=0,maskLayer=null,downloadURL=null,finished=false,lastSpeaker=null;
-let zoom=1,zoomX=0,zoomY=0,panDrag=null;
+let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,visualMode='trace',totalTime=0,loadId=0,pathVector=null,downloadURL=null,finished=false,lastSpeaker=null;
+const view=new DrawingView();
+let drawingWidth=1,drawingHeight=1,panDrag=null;
 try{const saved=localStorage.getItem('filigrana-visual-mode');if(['trace','dim','paths'].includes(saved))visualMode=saved;}catch{}
 $('visual-mode').value=visualMode;
 function applyVisualMode(){ $('canvas-wrap').classList.toggle('path-only',visualMode==='paths');paintPaths();draw(); }
@@ -50,10 +52,9 @@ function selectVoice(id,toggle=false){
 let palette={paper:'#f4f1e9',green:'#527153'};
 const photoColours=['#a94c2c','#276b86','#79518d'];
 function paintPaths(){
-  if(!maskLayer||!graph)return;
-  const mctx=maskLayer.getContext('2d');mctx.clearRect(0,0,maskLayer.width,maskLayer.height);
-  mctx.strokeStyle=visualMode==='dim'?'#c8d5c1':palette.green;mctx.lineWidth=1.1;
-  for(const e of graph.edges){mctx.beginPath();e.points.forEach((p,i)=>i?mctx.lineTo(p.x,p.y):mctx.moveTo(p.x,p.y));mctx.stroke();}
+  pathVector=null;if(!graph)return;
+  pathVector=new Path2D();
+  for(const e of graph.edges)e.points.forEach((p,i)=>i?pathVector.lineTo(p.x,p.y):pathVector.moveTo(p.x,p.y));
 }
 function refreshPalette(){
   const styles=getComputedStyle(document.documentElement),value=key=>styles.getPropertyValue(key).trim();
@@ -161,7 +162,7 @@ async function loadImage(src,name){
   const id=++loadId;stop();busy=true;uiState();message('Reading the image…');
   try{
     const img=new Image();img.src=src;await img.decode();if(id!==loadId)return;image=img;
-    const scale=Math.min(1,960/Math.max(img.width,img.height));canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);
+    const scale=Math.min(1,960/Math.max(img.width,img.height));drawingWidth=Math.round(img.width*scale);drawingHeight=Math.round(img.height*scale);view.setDrawing(drawingWidth,drawingHeight);updateZoomControls();
     $('image-name').textContent=name;await analyse();
   }catch(e){busy=false;message(`Could not read this image. Try a JPEG or PNG. ${e.message}`);uiState();}
 }
@@ -169,10 +170,10 @@ async function analyse(){
   if(!image)return;stop();busy=true;uiState();message('Finding ink, thinning lines, and measuring the paths…');
   await new Promise(r=>setTimeout(r,35));
   try{
-    ctx.drawImage(image,0,0,canvas.width,canvas.height);
-    const mask=thin(inkMask(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height,+$('sensitivity').value),canvas.width,canvas.height);
-    graph=graphFromSkeleton(mask,canvas.width,canvas.height);totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.setGraph(graph);}
-    maskLayer=document.createElement('canvas');maskLayer.width=canvas.width;maskLayer.height=canvas.height;
+    const source=document.createElement('canvas');source.width=drawingWidth;source.height=drawingHeight;const sourceContext=source.getContext('2d',{willReadFrequently:true});
+    sourceContext.drawImage(image,0,0,drawingWidth,drawingHeight);
+    const mask=thin(inkMask(sourceContext.getImageData(0,0,drawingWidth,drawingHeight).data,drawingWidth,drawingHeight,+$('sensitivity').value),drawingWidth,drawingHeight);
+    graph=graphFromSkeleton(mask,drawingWidth,drawingHeight);totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.setGraph(graph);}
     paintPaths();
     $('junction-count').textContent=`${graph.junctions.length} junctions`;
     if(graph.edges.length){
@@ -181,27 +182,29 @@ async function analyse(){
     }else{
       message('No usable lines found. Increase ink sensitivity, or try a clearer drawing on plain paper.');$('canvas-note').textContent='No paths detected';$('frequency').textContent='—';$('edge-length').textContent='Try another sensitivity';
     }
-  }catch(e){graph=null;for(const t of travellers)t.setGraph(null);message(`Could not extract paths: ${e.message}`);}
+  }catch(e){graph=null;pathVector=null;for(const t of travellers)t.setGraph(null);message(`Could not extract paths: ${e.message}`);}
   busy=false;uiState();draw();
 }
 function locateClick(event){
   if(!graph?.edges.length||busy)return;
   const {x,y}=canvasPoint(event),t=travellers[selected];
   let nearest=Infinity,choice=null;
-  for(const node of graph.junctions){const d=Math.hypot(node.x-x,node.y-y);if(d<12&&d<nearest){nearest=d;choice={node};}}
+  for(const node of graph.junctions){const d=Math.hypot(node.x-x,node.y-y);if(d<12/view.scale&&d<nearest){nearest=d;choice={node};}}
   if(choice){const n=choice.node,id=chooseEdge(graph,n.id,null,$('branch').value,null,Math.random,t.visits);place(t,id,n.id);message();return;}
   for(const e of graph.edges)for(let i=0;i<e.points.length;i++){const p=e.points[i],d=Math.hypot(p.x-x,p.y-y);if(d<nearest){nearest=d;choice={e,i};}}
-  if(!choice||nearest>35){message('Click closer to a detected line to choose its start.');return;}
+  if(!choice||nearest>35/view.scale){message('Click closer to a detected line to choose its start.');return;}
   place(t,choice.e.id,choice.e.a,choice.e.lengths[choice.i]);message();
 }
 function draw(){
   if(!image)return;
+  const rect=canvas.getBoundingClientRect(),ratio=window.devicePixelRatio||1;view.resize(Math.max(1,rect.width),Math.max(1,rect.height));
+  const width=Math.round(view.width*ratio),height=Math.round(view.height*ratio);if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
   ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.shadowBlur=0;ctx.clearRect(0,0,canvas.width,canvas.height);
   if(visualMode!=='paths'){ctx.fillStyle=palette.paper;ctx.fillRect(0,0,canvas.width,canvas.height);}
-  ctx.save();ctx.translate(zoomX,zoomY);ctx.scale(zoom,zoom);
-  if(visualMode!=='paths'){ctx.globalAlpha=visualMode==='dim'?.52:.58;ctx.drawImage(image,0,0,canvas.width,canvas.height);ctx.globalAlpha=1;}
-  if(visualMode==='dim'){ctx.fillStyle='rgba(10,17,15,.58)';ctx.fillRect(0,0,canvas.width,canvas.height);}
-  if(maskLayer){ctx.globalAlpha=visualMode==='trace'?.23:visualMode==='dim'?.78:.82;ctx.drawImage(maskLayer,0,0);ctx.globalAlpha=1;}
+  ctx.save();ctx.setTransform(ratio*view.scale,0,0,ratio*view.scale,ratio*view.x,ratio*view.y);
+  if(visualMode!=='paths'){ctx.globalAlpha=visualMode==='dim'?.52:.58;ctx.drawImage(image,0,0,drawingWidth,drawingHeight);ctx.globalAlpha=1;}
+  if(visualMode==='dim'){ctx.fillStyle='rgba(10,17,15,.58)';ctx.fillRect(0,0,drawingWidth,drawingHeight);}
+  if(pathVector){ctx.globalAlpha=visualMode==='trace'?.23:visualMode==='dim'?.78:.82;ctx.strokeStyle=visualMode==='dim'?'#c8d5c1':palette.green;ctx.lineWidth=1.1;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke(pathVector);ctx.globalAlpha=1;}
   if(graph){ctx.fillStyle=visualMode==='dim'?'#d7e3d1':palette.green;ctx.globalAlpha=visualMode==='trace'?.28:visualMode==='dim'?.84:.8;for(const n of graph.junctions){ctx.beginPath();ctx.arc(n.x,n.y,1.8,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;}
   if(!graph){ctx.restore();return;}
   for(const t of travellers){
@@ -260,22 +263,26 @@ $('play').onclick=async()=>{
 function restart(){playbackClock.reset();audio.silence();conversation.reset();lastSpeaker=null;totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.restart();}if(playing){audio.setVolume(settings().volume*pieceEnvelope(0,settings().duration).gain);for(const t of active())soundEdge(t);answer();}uiState();draw();}
 $('reset').onclick=()=>{restart();message();};
 
-function canvasPoint(event){const r=canvas.getBoundingClientRect(),x=(event.clientX-r.left)*canvas.width/r.width,y=(event.clientY-r.top)*canvas.height/r.height;return{x:(x-zoomX)/zoom,y:(y-zoomY)/zoom};}
-function setZoom(next,x=canvas.width/2,y=canvas.height/2){next=Math.max(1,Math.min(6,next));const worldX=(x-zoomX)/zoom,worldY=(y-zoomY)/zoom;zoom=next;zoomX=zoom===1?0:x-worldX*zoom;zoomY=zoom===1?0:y-worldY*zoom;$('zoom-reset').textContent=`${Math.round(zoom*100)}%`;canvas.classList.toggle('zoomed',zoom>1);draw();}
-$('zoom-in').onclick=()=>setZoom(zoom*1.25);$('zoom-out').onclick=()=>setZoom(zoom/1.25);$('zoom-reset').onclick=()=>setZoom(1);
-canvas.addEventListener('wheel',event=>{event.preventDefault();const p=canvasPoint(event),factor=Math.exp(-event.deltaY*.001);setZoom(zoom*factor,p.x*zoom+zoomX,p.y*zoom+zoomY);},{passive:false});
+function screenPoint(event){const r=canvas.getBoundingClientRect();return{x:event.clientX-r.left,y:event.clientY-r.top};}
+function canvasPoint(event){const p=screenPoint(event);return view.toDrawing(p.x,p.y);}
+function updateZoomControls(){$('zoom-reset').textContent=`${Math.round(view.zoom*100)}%`;canvas.classList.toggle('zoomed',view.zoom>1);}
+function setZoom(next,x,y){view.zoomAt(next,x,y);updateZoomControls();draw();}
+$('zoom-in').onclick=()=>setZoom(view.zoom*1.25);$('zoom-out').onclick=()=>setZoom(view.zoom/1.25);$('zoom-reset').onclick=()=>setZoom(1);
+canvas.addEventListener('wheel',event=>{event.preventDefault();const p=screenPoint(event);setZoom(view.zoom*Math.exp(-event.deltaY*.001),p.x,p.y);},{passive:false});
+window.addEventListener('resize',draw);
+if(typeof ResizeObserver!=='undefined')new ResizeObserver(draw).observe($('canvas-wrap'));
 canvas.addEventListener('pointerdown',event=>{
-  if(event.shiftKey||event.button===1){if(zoom<=1)return;event.preventDefault();panDrag={pointer:event.pointerId,x:event.clientX,y:event.clientY,moved:false,placeOnTap:false};canvas.setPointerCapture(event.pointerId);canvas.classList.add('panning');return;}
+  if(event.shiftKey||event.button===1){if(view.zoom<=1)return;event.preventDefault();panDrag={pointer:event.pointerId,x:event.clientX,y:event.clientY,moved:false,placeOnTap:false};canvas.setPointerCapture(event.pointerId);canvas.classList.add('panning');return;}
   if(busy||!graph?.edges.length||event.button!==0)return;
-  const {x,y}=canvasPoint(event),rect=canvas.getBoundingClientRect();let nearest=null,distance=20;
-  for(const t of travellers){const p=t.position();if(!p)continue;const d=Math.hypot((p.x-x)*rect.width/canvas.width*zoom,(p.y-y)*rect.height/canvas.height*zoom);if(d<distance){nearest=t;distance=d;}}
-  if(!nearest){if(zoom>1){event.preventDefault();panDrag={pointer:event.pointerId,x:event.clientX,y:event.clientY,moved:false,placeOnTap:true};canvas.setPointerCapture(event.pointerId);canvas.classList.add('panning');}return;}
+  const cursor=screenPoint(event);let nearest=null,distance=20;
+  for(const t of travellers){const position=t.position();if(!position)continue;const p=view.toScreen(position.x,position.y),d=Math.hypot(p.x-cursor.x,p.y-cursor.y);if(d<distance){nearest=t;distance=d;}}
+  if(!nearest){if(view.zoom>1){event.preventDefault();panDrag={pointer:event.pointerId,x:event.clientX,y:event.clientY,moved:false,placeOnTap:true};canvas.setPointerCapture(event.pointerId);canvas.classList.add('panning');}return;}
   event.preventDefault();selected=nearest.id;drag={id:nearest.id,pointer:event.pointerId,position:nearest.position()};canvas.setPointerCapture(event.pointerId);uiState();draw();
 });
 canvas.addEventListener('pointermove',event=>{
-  if(panDrag?.pointer===event.pointerId){const rect=canvas.getBoundingClientRect();if(Math.hypot(event.clientX-panDrag.x,event.clientY-panDrag.y)>2)panDrag.moved=true;zoomX+=(event.clientX-panDrag.x)*canvas.width/rect.width;zoomY+=(event.clientY-panDrag.y)*canvas.height/rect.height;panDrag.x=event.clientX;panDrag.y=event.clientY;draw();return;}
+  if(panDrag?.pointer===event.pointerId){if(Math.hypot(event.clientX-panDrag.x,event.clientY-panDrag.y)>2)panDrag.moved=true;view.panBy(event.clientX-panDrag.x,event.clientY-panDrag.y);panDrag.x=event.clientX;panDrag.y=event.clientY;draw();return;}
   if(!drag||event.pointerId!==drag.pointer)return;
-  const p=canvasPoint(event);drag.position={x:Math.max(0,Math.min(canvas.width,p.x)),y:Math.max(0,Math.min(canvas.height,p.y))};draw();
+  const p=canvasPoint(event);drag.position={x:Math.max(0,Math.min(drawingWidth,p.x)),y:Math.max(0,Math.min(drawingHeight,p.y))};draw();
 });
 canvas.addEventListener('pointerup',event=>{
   if(panDrag?.pointer===event.pointerId){const shouldPlace=panDrag.placeOnTap&&!panDrag.moved;panDrag=null;canvas.classList.remove('panning');suppressClick=true;canvas.releasePointerCapture(event.pointerId);if(shouldPlace)locateClick(event);draw();return;}

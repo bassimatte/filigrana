@@ -392,3 +392,6 @@ label:hover output, label:has(+ input[type=range]:is(:focus-visible,:active,:hov
   .transport-status { padding-right: 0; gap: 4px; }
 }
 .voice-button>span.voice-copy { display: block; }
+@media(max-width:360px) {
+  .theme-switch button { font-size: 0; gap: 0; min-width: 28px; padding: 6px; }
+}

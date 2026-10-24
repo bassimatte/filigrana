@@ -1,3 +1,4 @@
+import {PlaybackClock} from './playback-clock.js?v=9';
 import {MixRecorder,canRecord} from './recorder.js?v=7';
 import {PRESETS,matchingPreset} from './presets.js?v=6';
 import {inkMask,thin,graphFromSkeleton,resonance,chooseEdge,pointOnEdge} from './geometry.js';
@@ -9,7 +10,7 @@ import {Conversation,pieceEnvelope} from './performance.js';
 import {CONTROL_LIMITS,validateComposition} from './composition.js?v=6';
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
-let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,photo=true,paths=true,lastTime=0,totalTime=0,loadId=0,maskLayer=null,downloadURL=null,finished=false,lastSpeaker=null;
+let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,photo=true,paths=true,totalTime=0,loadId=0,maskLayer=null,downloadURL=null,finished=false,lastSpeaker=null;
 let recorder=null,pendingRecorder=null,recordPreparing=false,recordSaving=false,recordGeneration=0;
 try{const saved=localStorage.getItem('filigrana-recording-format');if(['mp3','wav'].includes(saved))$('record-format').value=saved;}catch{}
 function recordingInfo(){
@@ -22,6 +23,8 @@ const recordingMenu=$('record-settings');
 document.addEventListener('click',event=>{if(!recordingMenu.contains(event.target))recordingMenu.removeAttribute('open');});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&recordingMenu.hasAttribute('open')){recordingMenu.removeAttribute('open');recordingMenu.querySelector('summary').focus();}});
 const conversation=new Conversation();
+const playbackClock=new PlaybackClock(advanceMusic);
+let musicDirty=false;
 let openVoice=null,drag=null,suppressClick=false;
 function voiceOverview(){
   for(const t of travellers){
@@ -99,7 +102,7 @@ function uiState(){
   $('canvas-note').textContent=busy?'Reading drawing…':'No paths detected';
   voiceOverview();audio.setActiveCount(active().length);
 }
-function stop(){playing=false;audio.silence();conversation.reset();lastSpeaker=null;if(recordPreparing)cancelRecordingPreparation();else if(recording)endRecording();uiState();}
+function stop(){playbackClock.stop();playing=false;audio.silence();conversation.reset();lastSpeaker=null;if(recordPreparing)cancelRecordingPreparation();else if(recording)endRecording();uiState();}
 function place(t,edgeId,from,distance=0){audio.silenceChannel(t.id);conversation.remove(t.id);t.place(edgeId,from,distance);soundEdge(t);uiState();draw();}
 function syncTraveller(t){
   for(const key of ['instrument','octave','scale'])$(`${key}-${t.id}`).value=t[key];$(`enabled-${t.id}`).checked=t.enabled;
@@ -208,15 +211,17 @@ function draw(){
   $('note-name').textContent=`Voice ${selected+1} · ${t.scale==='free'?'free pitch':noteName(hz)}${t.heardPitch===null?' · ready':''}`;
   $('resonance-label').textContent=note?'LAST NOTE · SELECTED TRAVELLER':'RESONANCE · SELECTED TRAVELLER';$('edge-length').textContent=`${Math.round(e.length)} px · segment ${e.id+1}`;
 }
-function frame(now){
-  const dt=Math.min(.1,(now-(lastTime||now))/1000);lastTime=now;
-  if(playing){
-    totalTime+=dt;const s=settings(),form=pieceEnvelope(totalTime,s.duration);audio.setVolume(s.volume*form.gain);
-    for(const t of travellers){t.advance(dt,t.speed*s.speed,s.mode,soundEdge);if(t.enabled&&t.walker&&isNoteVoice(t.instrument)){const e=graph.edges[t.walker.edge];audio.colour(curvature(e,t.walker.reverse?e.length-t.walker.distance:t.walker.distance),t.id);}}
-    if(form.acceptNotes)answer();else conversation.pending.clear();
-    if(form.finished){finished=true;stop();message();}
-    if(!active().length)stop();draw();
-  }
+function advanceMusic(dt){
+  if(!playing||dt<=0)return;
+  totalTime+=dt;musicDirty=true;const s=settings(),form=pieceEnvelope(totalTime,s.duration);
+  if(form.finished){finished=true;stop();message();return;}
+  audio.setVolume(s.volume*form.gain);
+  for(const t of travellers){t.advance(dt,t.speed*s.speed,s.mode,soundEdge);if(t.enabled&&t.walker&&isNoteVoice(t.instrument)){const e=graph.edges[t.walker.edge];audio.colour(curvature(e,t.walker.reverse?e.length-t.walker.distance:t.walker.distance),t.id);}}
+  if(form.acceptNotes)answer();else conversation.pending.clear();
+  if(!active().length)stop();
+}
+function frame(){
+  if(!document.hidden&&(playing||musicDirty)){draw();musicDirty=false;}
   const s=settings(),form=pieceEnvelope(totalTime,s.duration),status=finished?'Finished.':playing&&!form.acceptNotes?'Last notes…':'';
   if($('performance-status').textContent!==status)$('performance-status').textContent=status;
   $('performance-status').hidden=!status;
@@ -226,7 +231,7 @@ function frame(now){
   else{sx.moveTo(0,scope.height/2);sx.lineTo(scope.width,scope.height/2);}sx.stroke();requestAnimationFrame(frame);
 }
 function startPlayback(){
-  if(finished)restart();playing=true;const s=settings();conversation.reset();lastSpeaker=null;
+  if(finished)restart();playing=true;playbackClock.start();const s=settings();conversation.reset();lastSpeaker=null;
   audio.setActiveCount(active().length);audio.setVolume(s.volume*pieceEnvelope(totalTime,s.duration).gain);
   for(const t of active()){audio.setTraveller(t.id,t.volume,t.pan);t.phrasing.reset();soundEdge(t);}answer();uiState();
 }
@@ -234,10 +239,10 @@ $('play').onclick=async()=>{
   if(playing){stop();return;}
   if(recordPreparing){cancelRecordingPreparation();uiState();return;}
   if(!active().length||busy)return;
-  try{await audio.init();startPlayback();message();}
+  try{await audio.init();await playbackClock.prepare(audio.ctx,audio.master);startPlayback();message();}
   catch(e){stop();message(`Could not start audio: ${e.message}`);}
 };
-function restart(){audio.silence();conversation.reset();lastSpeaker=null;totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.restart();}if(playing){audio.setVolume(settings().volume*pieceEnvelope(0,settings().duration).gain);for(const t of active())soundEdge(t);answer();}uiState();draw();}
+function restart(){playbackClock.reset();audio.silence();conversation.reset();lastSpeaker=null;totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.restart();}if(playing){audio.setVolume(settings().volume*pieceEnvelope(0,settings().duration).gain);for(const t of active())soundEdge(t);answer();}uiState();draw();}
 $('reset').onclick=()=>{restart();message();};
 $('original').onclick=()=>{photo=!photo;$('original').setAttribute('aria-pressed',photo);paintPaths();draw();};
 $('network').onclick=()=>{paths=!paths;$('network').setAttribute('aria-pressed',paths);draw();};
@@ -336,7 +341,7 @@ $('record').onclick=async()=>{
   recordPreparing=true;uiState();message('Preparing recording…');
   const reset=()=>{recorder=null;pendingRecorder=null;recordPreparing=false;recordSaving=false;recording=false;uiState();};
   try{
-    await audio.init();if(generation!==recordGeneration)return;
+    await audio.init();await playbackClock.prepare(audio.ctx,audio.master);if(generation!==recordGeneration)return;
     session=new MixRecorder(audio.ctx,audio.master,{
       format:$('record-format').value,
       onComplete:({blob,extension})=>{
@@ -355,5 +360,5 @@ $('record').onclick=async()=>{
     session?.cancel();if(generation===recordGeneration){if(shouldStart&&playing)stop();reset();message(`Could not start recording: ${error.message}`);}
   }
 };
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing){stop();message('Paused while this tab was hidden. Press Listen to continue.');}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){draw();musicDirty=false;}});
 mountTravellers();refreshPalette();applyPreset('floating');updateLabels();requestAnimationFrame(frame);loadImage('drawing.jpg','Example drawing');

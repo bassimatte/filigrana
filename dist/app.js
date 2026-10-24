@@ -17,7 +17,11 @@ const view=new DrawingView(),threadLights=new ThreadLights();
 const visualNow=()=>performance.now()/1000;
 let lastThreadMotion=0,hoverVoice=null;
 let drawingWidth=1,drawingHeight=1,panDrag=null;
-try{const saved=localStorage.getItem('filigrana-visual-mode');if(['threads','trace','dim','paths'].includes(saved))visualMode=saved;}catch{}
+try{
+  const adopted=localStorage.getItem('filigrana-threads-default')==='1',saved=localStorage.getItem('filigrana-visual-mode');
+  if(adopted&&['threads','trace','dim','paths'].includes(saved))visualMode=saved;
+  else{localStorage.setItem('filigrana-visual-mode','threads');localStorage.setItem('filigrana-threads-default','1');}
+}catch{}
 $('visual-mode').value=visualMode;
 function applyVisualMode(){ hoverVoice=null;$('canvas-wrap').classList.toggle('path-only',['paths','threads'].includes(visualMode));document.documentElement.classList.toggle('luminous-mode',visualMode==='threads');paintPaths();draw(); }
 applyVisualMode();

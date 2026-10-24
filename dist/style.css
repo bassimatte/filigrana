@@ -227,6 +227,7 @@ footer { justify-content: flex-end; }
 .settings-section + .settings-section { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 18px; }
 .settings-popover input[type="number"] { width: 100%; border: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--ink); padding: 10px 8px; font: inherit; }
 .settings-popover { max-height: calc(100vh - 72px); overflow-y: auto; }
+
 .canvas-wrap.luminous { background: transparent; background-image: none; border-color: transparent; }
 .canvas-wrap.luminous #drawing { box-shadow: none; }
 .zoom-tools { position: absolute; z-index: 2; top: 12px; right: 12px; display: flex; align-items: center; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 9px; background: var(--overlay); box-shadow: 0 3px 14px var(--shadow); }
@@ -444,4 +445,23 @@ select, .secondary { font-size: 12px; }
   .drawing-actions .view-mode-select { flex: 1 0 100%; width: 100%; }
   .view-mode-select select { width: 100%; max-width: none; }
   .drawing-toolbar label.upload { margin: 0; }
+}
+
+/* Keep drawing tools together as a small control dock. */
+.drawing-toolbar { min-height: 50px; margin: 0 0 12px; padding: 6px; border: 1px solid color-mix(in srgb,var(--line) 85%,transparent); border-radius: 11px; background: color-mix(in srgb,var(--surface) 88%,transparent); }
+.drawing-toolbar>span[hidden] { display: none !important; }
+.drawing-toolbar .drawing-actions { flex: 1 1 auto; width: 100%; min-width: 0; justify-content: space-between; gap: 10px; }
+.drawing-control-group { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.drawing-navigation-controls { padding-left: 10px; border-left: 1px solid color-mix(in srgb,var(--line) 75%,transparent); }
+.drawing-toolbar .view-mode-select { flex: 0 1 auto; }
+.drawing-toolbar .view-mode-select select { min-width: 145px; max-width: 190px; border-radius: 7px; background-color: color-mix(in srgb,var(--paper) 45%,transparent); }
+.drawing-toolbar label.upload { border-radius: 7px; background: color-mix(in srgb,var(--paper) 35%,transparent); }
+.drawing-toolbar label.upload:hover, .drawing-toolbar .view-mode-select select:hover { background: var(--field); border-color: var(--green); }
+@media(max-width:700px) {
+  .drawing-toolbar { min-height: 0; padding: 7px; }
+  .drawing-toolbar .drawing-actions { flex-wrap: wrap; justify-content: space-between; gap: 7px; }
+  .drawing-display-controls { width: 100%; justify-content: space-between; }
+  .drawing-toolbar .view-mode-select { flex: 1 1 140px; width: auto; }
+  .drawing-toolbar .view-mode-select select { width: 100%; max-width: none; min-width: 0; }
+  .drawing-navigation-controls { width: 100%; justify-content: flex-end; padding: 7px 0 0; border-left: 0; border-top: 1px solid color-mix(in srgb,var(--line) 75%,transparent); }
 }

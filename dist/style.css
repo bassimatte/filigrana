@@ -413,11 +413,16 @@ label:hover output, label:has(+ input[type=range]:is(:focus-visible,:active,:hov
 .drawing-settings-popover input[type=range] { margin: 13px 0 16px; }
 .drawing-settings-popover .hint { margin: 0 0 14px; }
 .drawing-settings-popover #analyse { width: 100%; }
+.drawing-settings-button { width: 36px; justify-content: center; padding: 7px; }
+.view-mode-select { position: relative; display: inline-flex; min-width: 0; }
+.view-mode-select select { padding-left: 34px; }
+.view-mode-icon { position: absolute; z-index: 1; left: 9px; top: 50%; width: 16px; height: 16px; transform: translateY(-50%); color: var(--green); pointer-events: none; }
 @media(max-width:360px) {
   .theme-switch button { font-size: 0; gap: 0; min-width: 28px; padding: 6px; }
 }
 @media(max-width:700px) {
   .drawing-toolbar .drawing-actions { flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
-  .drawing-actions select { flex: 1 0 100%; max-width: none; }
+  .drawing-actions .view-mode-select { flex: 1 0 100%; width: 100%; }
+  .view-mode-select select { width: 100%; max-width: none; }
   .drawing-toolbar label.upload { margin: 0; }
 }

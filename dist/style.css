@@ -54,6 +54,14 @@ header { height: 82px; }
 .theme-switch button span { margin-right: 3px; font-size: 14px; }
 .theme-switch button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
 .theme-switch button:hover:not([aria-pressed="true"]) { color: var(--ink); background: var(--field); }
+.theme-switch button { width: 34px; padding: 6px; font-size: 0; gap: 0; }
+.theme-switch button .ui-icon { width: 17px; height: 17px; }
+.composition-tools { display: flex; align-items: center; gap: 5px; }
+.header-action { width: 36px; height: 36px; display: inline-grid; place-items: center; padding: 0; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); background: var(--surface); cursor: pointer; }
+.header-action.upload { margin: 0; }
+.header-action .ui-icon { width: 17px; height: 17px; }
+.header-action:hover:not(:disabled) { color: var(--ink); border-color: var(--green); }
+.header-action:disabled { opacity: .4; cursor: default; }
 main { padding-top: 44px; }
 h1 { font-size: clamp(54px, 4.8vw, 70px); line-height: 1; }
 .intro-copy { font-size: 12px; }
@@ -227,7 +235,8 @@ footer { justify-content: flex-end; }
 #drawing.panning { cursor: grabbing; }
 .canvas-wrap.luminous #drawing.zoomed { cursor: grab; }
 .encoder-credits { display: inline-block; margin-top: 18px; font-size: 9px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
-@media(max-width:700px) { .header-tools { gap: 8px; } .settings-menu>summary { width: 32px; height: 32px; } }
+@media(max-width:700px) { .header-tools { gap: 7px; } .composition-tools { gap: 3px; } .header-action { width: 32px; height: 32px; } .theme-switch button { width: 30px; min-height: 28px; padding: 5px; } .theme-switch button .ui-icon { width: 15px; height: 15px; } .settings-menu>summary { width: 32px; height: 32px; } }
+@media(max-width:380px) { header { padding-left: 4vw; padding-right: 4vw; } .header-tools { gap: 4px; } .composition-tools { gap: 2px; } .theme-switch button { width: 27px; } .header-action, .settings-menu>summary { width: 29px; height: 29px; } .wordmark { gap: 7px; font-size: 11px; } .mark { font-size: 38px; } }
 
 /* The viewport fills the drawing panel; the camera fits and zooms the vector drawing. */
 .canvas-wrap #drawing { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; object-fit: fill; box-shadow: none; }

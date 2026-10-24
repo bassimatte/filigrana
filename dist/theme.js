@@ -2,13 +2,17 @@
 (() => {
   const root = document.documentElement;
   const system = window.matchMedia('(prefers-color-scheme: dark)');
-  let preference = 'system';
+  let preference = system.matches ? 'dark' : 'light';
   try {
     const saved = localStorage.getItem('filigrana-appearance');
-    if (['light', 'dark', 'system'].includes(saved)) preference = saved;
+    if (saved === 'light' || saved === 'dark') preference = saved;
+    else if (saved === 'system') {
+      preference = system.matches ? 'dark' : 'light';
+      localStorage.setItem('filigrana-appearance', preference);
+    }
   } catch { /* Appearance still works when browser storage is unavailable. */ }
   function apply() {
-    const theme = preference === 'system' ? (system.matches ? 'dark' : 'light') : preference;
+    const theme = preference;
     root.dataset.theme = theme;
     root.style.colorScheme = theme;
     document.querySelectorAll('[data-theme-choice]').forEach(button => {
@@ -19,7 +23,6 @@
     document.dispatchEvent(new Event('filigrana-theme-change'));
   }
   apply();
-  system.addEventListener('change', () => { if (preference === 'system') apply(); });
   document.addEventListener('DOMContentLoaded', () => {
     apply();
     document.querySelectorAll('[data-theme-choice]').forEach(button => {

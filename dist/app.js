@@ -338,6 +338,7 @@ function applyPreset(key){
 function customMood(){$('preset').value=matchingPreset(travellers,{room:+$('room').value,ring:+$('q').value,pace:+$('speed').value,gap:+$('response-gap').value});}
 $('preset').innerHTML=Object.entries(PRESETS).map(([key,p])=>`<option value="${key}">${key==='still'?'Still · calm trio':p.name}</option>`).join('')+'<option value="custom" disabled>Custom</option>';
 $('preset').onchange=()=>{if(Object.hasOwn(PRESETS,$('preset').value)){applyPreset($('preset').value);message();}};
+$('load-score-trigger').onclick=()=>$('load-score').click();
 document.querySelectorAll('.control-group').forEach(group=>group.addEventListener('toggle',()=>{
   if(group.open)document.querySelectorAll('.control-group[open]').forEach(other=>{if(other!==group)other.open=false;});
 }));

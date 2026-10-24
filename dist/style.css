@@ -204,3 +204,15 @@ footer { justify-content: flex-end; }
 .presets { padding: 0 0 4px; }
 .presets label { margin: 0 0 9px; }
 .presets select { font-size: 13px; padding: 12px; }
+
+.header-tools { gap: 12px; }
+.settings-menu { position: relative; }
+.settings-menu>summary { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); background: var(--surface); }
+.settings-menu>summary::-webkit-details-marker { display: none; }
+.settings-menu[open]>summary, .settings-menu>summary:hover { color: var(--ink); border-color: var(--green); }
+.settings-popover { position: absolute; z-index: 30; top: 48px; right: 0; width: 265px; max-width: 85vw; background: var(--field); border: 1px solid var(--line); border-radius: 12px; padding: 20px; box-shadow: 0 12px 40px var(--shadow); }
+.settings-popover h2 { margin: 0 0 18px; font-size: 25px; }
+.settings-popover label { margin-top: 0; }
+.settings-popover .hint { font-size: 10px; }
+.encoder-credits { display: inline-block; margin-top: 18px; font-size: 9px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+@media(max-width:700px) { .header-tools { gap: 8px; } .settings-menu>summary { width: 32px; height: 32px; } }

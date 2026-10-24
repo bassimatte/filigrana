@@ -1,6 +1,7 @@
+import {MixRecorder,canRecord} from './recorder.js?v=7';
 import {PRESETS,matchingPreset} from './presets.js?v=6';
 import {inkMask,thin,graphFromSkeleton,resonance,chooseEdge,pointOnEdge} from './geometry.js';
-import {Resonator} from './audio.js?v=6';
+import {Resonator} from './audio.js?v=7';
 import {bellPitch,bellDecay,curvature,noteName,tunePitch,SCALES} from './music.js';
 import {Traveller,defaultStarts} from './traveller.js';
 import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=6';
@@ -9,6 +10,17 @@ import {CONTROL_LIMITS,validateComposition} from './composition.js?v=6';
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
 let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,photo=true,paths=true,lastTime=0,totalTime=0,loadId=0,maskLayer=null,downloadURL=null,finished=false,lastSpeaker=null;
+let recorder=null,pendingRecorder=null,recordPreparing=false,recordSaving=false,recordGeneration=0;
+try{const saved=localStorage.getItem('filigrana-recording-format');if(['mp3','wav'].includes(saved))$('record-format').value=saved;}catch{}
+function recordingInfo(){
+  const rate=(Math.min($('record-format').value==='mp3'?48000:192000,audio.ctx?.sampleRate||48000)/1000).toLocaleString('en-US',{maximumFractionDigits:1});
+  $('record-format-info').textContent=canRecord()?`${$('record-format').value==='wav'?'24-bit': '320 kbps'} · ${rate} kHz · stereo`:'Recording is unavailable in this browser.';
+  $('record-format').disabled=recordPreparing||recordSaving||recording;
+}
+$('record-format').onchange=()=>{try{localStorage.setItem('filigrana-recording-format',$('record-format').value);}catch{}recordingInfo();};
+const recordingMenu=$('record-settings');
+document.addEventListener('click',event=>{if(!recordingMenu.contains(event.target))recordingMenu.removeAttribute('open');});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&recordingMenu.hasAttribute('open')){recordingMenu.removeAttribute('open');recordingMenu.querySelector('summary').focus();}});
 const conversation=new Conversation();
 let openVoice=null,drag=null,suppressClick=false;
 function voiceOverview(){
@@ -75,8 +87,8 @@ function soundEdge(t){
 function uiState(){
   $('play-label').textContent=playing?'Pause':finished?'Listen again':'Listen';$('play-icon').textContent=playing?'Ⅱ':'▶';
   $('state').textContent=busy?'ANALYSING':playing?`${active().length} TRAVELLING`:finished?'FINISHED':graph?.edges.length?'READY':'NO PATHS';
-  $('play').disabled=busy||!active().length;$('reset').disabled=busy||!travellers.some(t=>t.origin);$('record').disabled=!playing||typeof MediaRecorder==='undefined';
-  $('record').textContent=recording?'■ Save recording':'● Record';$('record').classList.toggle('recording',recording);
+  $('play').disabled=busy||!active().length;$('reset').disabled=busy||!travellers.some(t=>t.origin);$('record').disabled=recordPreparing||recordSaving||!playing||!canRecord();
+  $('record').textContent=recordPreparing?'Preparing…':recordSaving?'Saving…':recording?'■ Save recording':'● Record';recordingInfo();$('record').classList.toggle('recording',recording);
   $('save-score').disabled=busy||!image||!graph?.edges.length;
   for(const t of travellers){
     $(`traveller-${t.id}`).classList.toggle('selected',t.id===selected);$(`traveller-${t.id}`).classList.toggle('inactive',!t.enabled);
@@ -87,7 +99,7 @@ function uiState(){
   $('canvas-note').textContent=busy?'Reading drawing…':'No paths detected';
   voiceOverview();audio.setActiveCount(active().length);
 }
-function stop(){playing=false;audio.silence();conversation.reset();lastSpeaker=null;if(recording)endRecording();uiState();}
+function stop(){playing=false;audio.silence();conversation.reset();lastSpeaker=null;if(recordPreparing)cancelRecordingPreparation();else if(recording)endRecording();uiState();}
 function place(t,edgeId,from,distance=0){audio.silenceChannel(t.id);conversation.remove(t.id);t.place(edgeId,from,distance);soundEdge(t);uiState();draw();}
 function syncTraveller(t){
   for(const key of ['instrument','octave','scale'])$(`${key}-${t.id}`).value=t[key];$(`enabled-${t.id}`).checked=t.enabled;
@@ -308,14 +320,26 @@ $('load-score').onchange=async event=>{
     customMood();updateEffects();updateLabels();uiState();draw();message('Composition loaded.');
   }catch(error){message(`Could not load the composition: ${error.message}`);}finally{event.target.value='';uiState();}
 };
-function endRecording(){if(!recording)return;recording=false;audio.stopRecording();uiState();}
-$('record').onclick=()=>{
-  if(recording){endRecording();return;}
-  try{audio.record(blob=>{
-    if(downloadURL)URL.revokeObjectURL(downloadURL);downloadURL=URL.createObjectURL(blob);
-    const a=document.createElement('a'),ext=blob.type.includes('ogg')?'ogg':blob.type.includes('mp4')?'m4a':'webm';a.href=downloadURL;a.download=`filigrana-${new Date().toISOString().slice(0,19).replaceAll(':','-')}.${ext}`;a.click();message('Recording saved.');
-  });recording=true;uiState();message('Recording…');}
-  catch(e){message(e.message);}
+function cancelRecordingPreparation(){recordGeneration++;pendingRecorder?.cancel();pendingRecorder=null;recordPreparing=false;message();}
+function endRecording(){if(!recording)return;recording=false;recordSaving=true;uiState();message('Saving recording…');recorder.stop();}
+$('record').onclick=async()=>{
+  if(recording){endRecording();return;}if(recordPreparing||recordSaving||!playing)return;
+  const generation=++recordGeneration;recordPreparing=true;uiState();message('Preparing recording…');
+  const reset=()=>{recorder=null;pendingRecorder=null;recordPreparing=false;recordSaving=false;recording=false;uiState();};
+  const session=new MixRecorder(audio.ctx,audio.master,{
+    format:$('record-format').value,
+    onComplete:({blob,extension})=>{
+      if(generation!==recordGeneration)return;reset();
+      download(blob,`filigrana-${new Date().toISOString().slice(0,19).replaceAll(':','-')}.${extension}`);message('Recording saved.');
+    },
+    onError:error=>{if(generation!==recordGeneration)return;reset();message(`Could not save recording: ${error.message}`);},
+    onLimit:()=>{recording=false;recordSaving=true;uiState();message('Saving recording…');}
+  });
+  pendingRecorder=session;
+  try{
+    await session.start();if(generation!==recordGeneration||!playing){session.cancel();return;}
+    pendingRecorder=null;recorder=session;recordPreparing=false;recording=true;uiState();message('Recording…');
+  }catch(error){session.cancel();if(generation===recordGeneration){reset();message(`Could not start recording: ${error.message}`);}}
 };
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing){stop();message('Paused while this tab was hidden. Press Listen to continue.');}});
 mountTravellers();refreshPalette();applyPreset('floating');updateLabels();requestAnimationFrame(frame);loadImage('drawing.jpg','Example drawing');

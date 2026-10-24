@@ -4,7 +4,9 @@ export class Resonator {
   async init(context=null) {
     if(this.ctx){if(!this.ctx.startRendering)await this.ctx.resume();return;}
     const Context=context?null:(window.AudioContext||window.webkitAudioContext);if(!context&&!Context)throw new Error('This browser does not support Web Audio.');
-    const c=this.ctx=context||new Context();
+    let c=context;
+    if(!c){try{c=new Context({sampleRate:48000});}catch(error){if(error.name!=='NotSupportedError')throw error;c=new Context();}}
+    this.ctx=c;
     const buffer=c.createBuffer(1,c.sampleRate*2,c.sampleRate),data=buffer.getChannelData(0);
     for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
     this.noise=c.createBufferSource();this.noise.buffer=buffer;this.noise.loop=true;
@@ -43,7 +45,7 @@ export class Resonator {
     const limiter=c.createWaveShaper();limiter.curve=limiterCurve();limiter.oversample='2x';comp.connect(limiter);
     this.master=c.createGain();this.master.gain.value=0;limiter.connect(this.master);
     this.analyser=c.createAnalyser();this.analyser.fftSize=1024;this.master.connect(this.analyser);this.analyser.connect(c.destination);
-    this.recordDestination=c.createMediaStreamDestination?c.createMediaStreamDestination():null;if(this.recordDestination)this.master.connect(this.recordDestination);
+
     this.noise.start();if(!c.startRendering)await c.resume();
   }
   setVolume(value,playing=true) {if(this.ctx)this.master.gain.setTargetAtTime(playing?value*.8:0,this.ctx.currentTime,.04);}
@@ -135,12 +137,4 @@ export class Resonator {
     for(const v of this.voices)if(v.travellerId===travellerId)this.releaseVoice(v);channel.currentVoice=null;
   }
   silence(){if(!this.ctx)return;for(let i=0;i<this.channels.length;i++)this.silenceChannel(i);this.setVolume(0,false);}
-  record(onFinished) {
-    if(typeof MediaRecorder==='undefined')throw new Error('Audio recording is unavailable in this browser.');
-    const mime=['audio/webm;codecs=opus','audio/ogg;codecs=opus','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t));
-    this.recorder=new MediaRecorder(this.recordDestination.stream,mime?{mimeType:mime}:undefined);
-    const chunks=[];this.recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data);};
-    this.recorder.onstop=()=>onFinished(new Blob(chunks,{type:this.recorder.mimeType}));this.recorder.start();
-  }
-  stopRecording(){if(this.recorder?.state==='recording')this.recorder.stop();}
 }

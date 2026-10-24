@@ -1,4 +1,5 @@
 import {ThreadLights,drawThreads} from './luminous-threads.js?v=16';
+import {drawAmbient} from './ambient-views.js?v=1';
 import {DrawingView} from './drawing-view.js?v=12';
 import {PlaybackClock} from './playback-clock.js?v=9';
 import {MixRecorder,canRecord} from './recorder.js?v=7';
@@ -18,9 +19,10 @@ const view=new DrawingView(),threadLights=new ThreadLights();
 const visualNow=()=>performance.now()/1000;
 let lastThreadMotion=0,hoverVoice=null;
 let drawingWidth=1,drawingHeight=1,panDrag=null;
+const visualModes=['threads','trace','afterimage','halos','waves','dew','mist'];
 try{
   const adopted=localStorage.getItem('filigrana-threads-default')==='1',saved=localStorage.getItem('filigrana-visual-mode');
-  if(adopted&&['threads','trace'].includes(saved))visualMode=saved;
+  if(adopted&&visualModes.includes(saved))visualMode=saved;
   else{localStorage.setItem('filigrana-visual-mode','threads');localStorage.setItem('filigrana-threads-default','1');}
 }catch{}
 $('visual-mode').value=visualMode;
@@ -90,7 +92,7 @@ function perform(t,note){
     t.strikes++;
   }else{audio.tune(note.hz,t.ring,t.id);audio.exciteEdge(t.instrument,note.duration,t.id);}
   t.heardPitch=note.hz;t.pulse=1;lastSpeaker=t.id;pulseVoice(t.id);
-  if(visualMode==='threads')threadLights.emit(graph,t.id,t.walker.edge,t.walker.from,t.walker.distance,visualNow());
+  if(visualMode!=='trace')threadLights.emit(graph,t.id,t.walker.edge,t.walker.from,t.walker.distance,visualNow());
 }
 function pulseVoice(id){
   const light=$(`voice-light-${id}`);if(!light)return;light.getAnimations?.().forEach(animation=>animation.cancel());
@@ -226,7 +228,7 @@ function draw(){
   ctx.save();ctx.setTransform(ratio*view.scale,0,0,ratio*view.scale,ratio*view.x,ratio*view.y);
   if(visualMode==='threads'){
     drawThreads(ctx,{graph,path:pathVector,travellers,scale:view.scale,now:visualNow(),pulses:threadLights.live(visualNow()),lastMotion:lastThreadMotion,playing,hover:hoverVoice,drag,palette,dark:document.documentElement.dataset.theme==='dark',reducedMotion:window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches});
-  }else{
+  }else if(visualMode==='trace'){
     ctx.globalAlpha=.58;ctx.drawImage(image,0,0,drawingWidth,drawingHeight);ctx.globalAlpha=1;
     if(pathVector){ctx.globalAlpha=.23;ctx.strokeStyle=palette.green;ctx.lineWidth=1.1;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke(pathVector);ctx.globalAlpha=1;}
     if(graph){ctx.fillStyle=palette.green;ctx.globalAlpha=.28;for(const n of graph.junctions){ctx.beginPath();ctx.arc(n.x,n.y,1.8,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;}
@@ -240,6 +242,8 @@ function draw(){
       ctx.strokeStyle=palette.paper;ctx.fillStyle=colour;ctx.lineWidth=1.7;ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);ctx.fill();ctx.stroke();
       ctx.font='bold 8px sans-serif';ctx.textAlign='center';ctx.fillStyle=colour;ctx.fillText(String(t.id+1),p.x,p.y-12);ctx.globalAlpha=1;
     }
+  }else{
+    drawAmbient(ctx,{mode:visualMode,graph,path:pathVector,travellers,scale:view.scale,now:visualNow(),pulses:threadLights.live(visualNow()),lastMotion:lastThreadMotion,playing,hover:hoverVoice,drag,palette,reducedMotion:window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches});
   }
   if(!graph){ctx.restore();return;}
   for(const t of travellers){if(!t.walker)continue;const hz=t.heardPitch??pitch(t,graph.edges[t.walker.edge]);$(`traveller-note-${t.id}`).textContent=`${t.enabled?'':'Off · '}${t.scale==='free'?`${hz.toFixed(1)} Hz`:noteName(hz)} · ${isNoteVoice(t.instrument)?`${t.strikes} ${t.strikes===1?'note':'notes'}`:'resonance'}`;}
@@ -260,7 +264,7 @@ function advanceMusic(dt){
   if(!active().length)stop();
 }
 function frame(){
-  if(!document.hidden&&(playing||musicDirty||(visualMode==='threads'&&(threadLights.live(visualNow()).length||visualNow()<lastThreadMotion+4)))){draw();musicDirty=false;}
+  if(!document.hidden&&(playing||musicDirty||(visualMode!=='trace'&&(threadLights.live(visualNow()).length||visualNow()<lastThreadMotion+4)))){draw();musicDirty=false;}
   const s=settings(),form=pieceEnvelope(totalTime,s.duration),status=finished?'Finished.':playing&&!form.acceptNotes?'Last notes…':'';
   if($('performance-status').textContent!==status)$('performance-status').textContent=status;
   $('performance-status').hidden=!status;

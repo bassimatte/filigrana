@@ -265,8 +265,14 @@ $('reset').onclick=()=>{restart();message();};
 
 function screenPoint(event){const r=canvas.getBoundingClientRect();return{x:event.clientX-r.left,y:event.clientY-r.top};}
 function canvasPoint(event){const p=screenPoint(event);return view.toDrawing(p.x,p.y);}
-function updateZoomControls(){$('zoom-reset').textContent=`${Math.round(view.zoom*100)}%`;canvas.classList.toggle('zoomed',view.zoom>1);}
-function setZoom(next,x,y){view.zoomAt(next,x,y);updateZoomControls();draw();}
+function updateZoomControls(){const focused=view.zoom>1;$('zoom-reset').textContent=`${Math.round(view.zoom*100)}%`;canvas.classList.toggle('zoomed',focused);canvas.closest('.workspace').classList.toggle('drawing-focus',focused);$('zoom-reset').title=focused?'Reset zoom and restore drawing controls':'Reset zoom';}
+function setZoom(next,x,y){
+  const before=canvas.getBoundingClientRect(),anchor=x===undefined?null:view.toDrawing(x,y);
+  view.zoomAt(next,x,y);updateZoomControls();
+  const after=canvas.getBoundingClientRect();view.resize(Math.max(1,after.width),Math.max(1,after.height));
+  if(anchor&&view.zoom>1){const screen=view.toScreen(anchor.x,anchor.y);view.panBy(before.left+x-after.left-screen.x,before.top+y-after.top-screen.y);}
+  draw();
+}
 $('zoom-in').onclick=()=>setZoom(view.zoom*1.25);$('zoom-out').onclick=()=>setZoom(view.zoom/1.25);$('zoom-reset').onclick=()=>setZoom(1);
 canvas.addEventListener('wheel',event=>{event.preventDefault();const p=screenPoint(event);setZoom(view.zoom*Math.exp(-event.deltaY*.001),p.x,p.y);},{passive:false});
 window.addEventListener('resize',draw);

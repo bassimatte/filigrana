@@ -10,6 +10,7 @@ import {Traveller,defaultStarts} from './traveller.js?v=2';
 import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=6';
 import {Conversation,pieceEnvelope} from './performance.js';
 import {CONTROL_LIMITS,validateComposition} from './composition.js?v=6';
+const icon=name=>`<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-${name}"/></svg>`;
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
 let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,visualMode='threads',totalTime=0,loadId=0,pathVector=null,downloadURL=null,finished=false,lastSpeaker=null;
@@ -47,6 +48,7 @@ function voiceOverview(){
     const button=$(`voice-${t.id}`);if(!button)continue;
     button.setAttribute('aria-expanded',String(openVoice===t.id));button.closest('.voice-chip').classList.toggle('editing',openVoice===t.id);
     button.classList.toggle('selected',selected===t.id);button.classList.toggle('muted',!t.enabled);
+    if(!t.enabled)$(`voice-light-${t.id}`)?.getAnimations?.().forEach(animation=>animation.cancel());
     $(`voice-name-${t.id}`).textContent=instrument(t.instrument).label;
     $(`mute-${t.id}`).setAttribute('aria-pressed',String(!t.enabled));
     $(`mute-${t.id}`).textContent=t.enabled?'On':'Muted';
@@ -87,8 +89,13 @@ function perform(t,note){
     if(!audio.strike(note.hz,s.q,0,note.bend,t.id,t.instrument))return;
     t.strikes++;
   }else{audio.tune(note.hz,s.q,t.id);audio.exciteEdge(t.instrument,note.duration,t.id);}
-  t.heardPitch=note.hz;t.pulse=1;lastSpeaker=t.id;
+  t.heardPitch=note.hz;t.pulse=1;lastSpeaker=t.id;pulseVoice(t.id);
   if(visualMode==='threads')threadLights.emit(graph,t.id,t.walker.edge,t.walker.from,t.walker.distance,visualNow());
+}
+function pulseVoice(id){
+  const light=$(`voice-light-${id}`);if(!light)return;light.getAnimations?.().forEach(animation=>animation.cancel());
+  const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  light.animate?.(reduced?[{opacity:.55},{opacity:1},{opacity:.55}]:[{opacity:.55,filter:'brightness(1)',boxShadow:'0 0 8px 1px currentColor'},{offset:.12,opacity:1,filter:'brightness(1.5)',boxShadow:'0 0 20px 5px currentColor'},{opacity:.55,filter:'brightness(1)',boxShadow:'0 0 8px 1px currentColor'}],{duration:reduced?900:1700,easing:'ease-out'});
 }
 function answer(){
   const s=settings();if(s.interaction!=='conversation'||!pieceEnvelope(totalTime,s.duration).acceptNotes)return;
@@ -106,10 +113,10 @@ function soundEdge(t){
   if(s.interaction==='conversation')conversation.offer(t.id,note);else perform(t,note);
 }
 function uiState(){
-  $('play-label').textContent=playing?'Pause':recordPreparing?'Cancel':finished?'Listen again':'Listen';$('play-icon').textContent=playing?'Ⅱ':recordPreparing?'×':'▶';
+  $('play-label').textContent=playing?'Pause':recordPreparing?'Cancel':finished?'Listen again':'Listen';$('play-icon').innerHTML=icon(playing?'pause':recordPreparing?'close':'play');
   $('state').textContent=busy?'ANALYSING':playing?`${active().length} TRAVELLING`:finished?'FINISHED':graph?.edges.length?'READY':'NO PATHS';
   $('play').disabled=busy||!active().length;$('reset').disabled=busy||!travellers.some(t=>t.origin);$('record').disabled=recordPreparing||recordSaving||busy||!active().length||!canRecord();
-  $('record').textContent=recordPreparing?'Preparing…':recordSaving?'Saving…':recording?'■ Save recording':'● Record';recordingInfo();$('record').classList.toggle('recording',recording);
+  $('record-label').textContent=recordPreparing?'Preparing…':recordSaving?'Saving…':recording?'Save recording':'Record';$('record-icon').innerHTML=icon(recordPreparing||recordSaving?'loader':recording?'stop':'record');$('record').setAttribute('aria-pressed',String(recording));$('record').setAttribute('aria-busy',String(recordPreparing||recordSaving));$('record-indicator').hidden=!recording;recordingInfo();$('record').classList.toggle('recording',recording);$('record').classList.toggle('busy',recordPreparing||recordSaving);
   $('save-score').disabled=busy||!image||!graph?.edges.length;
   for(const t of travellers){
     $(`traveller-${t.id}`).classList.toggle('selected',t.id===selected);$(`traveller-${t.id}`).classList.toggle('inactive',!t.enabled);
@@ -122,25 +129,27 @@ function uiState(){
 }
 function stop(){playbackClock.stop();playing=false;audio.silence();conversation.reset();lastSpeaker=null;if(recordPreparing)cancelRecordingPreparation();else if(recording)endRecording();uiState();}
 function place(t,edgeId,from,distance=0){threadLights.clear(t.id);audio.silenceChannel(t.id);conversation.remove(t.id);t.place(edgeId,from,distance);soundEdge(t);uiState();draw();}
+function paintRange(input){const min=+(input.getAttribute('min')||0),max=+(input.getAttribute('max')||100),value=+input.value;input.style.setProperty('--range-progress',`${Math.max(0,Math.min(100,(value-min)/(max-min)*100))}%`);}
+function refreshRanges(){document.querySelectorAll('input[type=range]').forEach(paintRange);}
 function syncTraveller(t){
   for(const key of ['instrument','octave','scale'])$(`${key}-${t.id}`).value=t[key];$(`enabled-${t.id}`).checked=t.enabled;
   for(const [key,value,unit]of [['speed',t.speed,' px/s'],['spacing',t.spacing,' s'],['volume',Math.round(t.volume*100),'%'],['pan',Math.round(t.pan*100),'']]){
-    $(`expression-${key}-${t.id}`).value=value;$(`expression-${key}-value-${t.id}`).textContent=key==='pan'?(value===0?'Center':`${Math.abs(value)}% ${value<0?'L':'R'}`):value+unit;
+    $(`expression-${key}-${t.id}`).value=value;paintRange($(`expression-${key}-${t.id}`));$(`expression-${key}-value-${t.id}`).textContent=key==='pan'?(value===0?'Center':`${Math.abs(value)}% ${value<0?'L':'R'}`):value+unit;
   }
 }
 function mountTravellers(){
   for(const t of travellers){
     const card=document.createElement('section');card.className='traveller';card.id=`traveller-${t.id}`;card.style.setProperty('--traveller',`var(--voice-${t.id+1})`);card.setAttribute('aria-label',`Voice ${t.id+1} settings`);card.hidden=true;
     card.innerHTML=`<div class="traveller-heading"><span><i></i>Voice ${t.id+1}</span><label class="enable-label"><input id="enabled-${t.id}" type="checkbox" checked aria-label="Enable voice ${t.id+1}">On</label></div>
-      <button class="place-button" id="place-${t.id}" aria-pressed="${t.id===0}" aria-label="Set start for voice ${t.id+1}">⌖ Set start</button>
+      <button class="place-button" id="place-${t.id}" aria-pressed="${t.id===0}" aria-label="Set start for voice ${t.id+1}">${icon('pin')} Set start</button>
       <div class="traveller-fields"><label for="instrument-${t.id}">Instrument</label><select id="instrument-${t.id}" aria-label="Instrument for voice ${t.id+1}">${Object.entries(INSTRUMENTS).map(([key,s])=>`<option value="${key}">${s.label}</option>`).join('')}</select>
       <label for="octave-${t.id}">Octave</label><select id="octave-${t.id}" aria-label="Octave for voice ${t.id+1}">${[-2,-1,0,1,2].map(o=>`<option value="${o}" ${o===0?'selected':''}>${o>0?'+':''}${o}${o===0?' · original':''}</option>`).join('')}</select>
       <label for="scale-${t.id}">Tuning</label><select id="scale-${t.id}" aria-label="Tuning for voice ${t.id+1}">${Object.entries(SCALES).map(([key,s])=>`<option value="${key}">${s.label}</option>`).join('')}</select></div>
       <p class="traveller-note" id="traveller-note-${t.id}">Waiting for ink…</p>
-      <details class="traveller-expression"><summary>Expression <span>+</span></summary>${[['speed','Speed',10,240,1],['spacing','Note spacing',.8,12,.1],['volume','Volume',0,100,1],['pan','Stereo',-100,100,1]].map(([key,label,min,max,step])=>`<label for="expression-${key}-${t.id}">${label}<output id="expression-${key}-value-${t.id}"></output></label><input id="expression-${key}-${t.id}" aria-label="${label} for voice ${t.id+1}" type="range" min="${min}" max="${max}" step="${step}">`).join('')}</details>`;
+      <details class="traveller-expression"><summary>Expression <span>${icon('plus')}</span></summary>${[['speed','Speed',10,240,1],['spacing','Note spacing',.8,12,.1],['volume','Volume',0,100,1],['pan','Stereo',-100,100,1]].map(([key,label,min,max,step])=>`<label for="expression-${key}-${t.id}">${label}<output id="expression-${key}-value-${t.id}"></output></label><input id="expression-${key}-${t.id}" aria-label="${label} for voice ${t.id+1}" type="range" min="${min}" max="${max}" step="${step}">`).join('')}</details>`;
     $('travellers').append(card);
     const chip=document.createElement('div');chip.className='voice-chip';chip.style.setProperty('--traveller',`var(--voice-${t.id+1})`);
-    chip.innerHTML=`<button type="button" class="voice-button" id="voice-${t.id}" aria-expanded="false" aria-controls="traveller-${t.id}" aria-label="Voice ${t.id+1} settings"><span class="voice-number">${t.id+1}</span><span><strong>Voice ${t.id+1}</strong><span id="voice-name-${t.id}"></span></span><span aria-hidden="true">⌄</span></button><button type="button" class="voice-mute" id="mute-${t.id}" aria-pressed="false" aria-label="Mute voice ${t.id+1}">On</button>`;
+    chip.innerHTML=`<button type="button" class="voice-button" id="voice-${t.id}" aria-expanded="false" aria-controls="traveller-${t.id}" aria-label="Voice ${t.id+1} settings"><span class="voice-number" aria-hidden="true"><i class="voice-light" id="voice-light-${t.id}"></i></span><span class="voice-copy"><strong>Voice ${t.id+1}</strong><span id="voice-name-${t.id}"></span></span></button><button type="button" class="voice-mute" id="mute-${t.id}" aria-pressed="false" aria-label="Mute voice ${t.id+1}">On</button>`;
     $('voice-bar').append(chip);
     $(`voice-${t.id}`).onclick=()=>selectVoice(t.id,true);
     $(`mute-${t.id}`).onclick=()=>{$(`enabled-${t.id}`).checked=!t.enabled;$(`enabled-${t.id}`).onchange();};
@@ -280,7 +289,7 @@ $('reset').onclick=()=>{restart();message();};
 
 function screenPoint(event){const r=canvas.getBoundingClientRect();return{x:event.clientX-r.left,y:event.clientY-r.top};}
 function canvasPoint(event){const p=screenPoint(event);return view.toDrawing(p.x,p.y);}
-function updateZoomControls(){$('zoom-reset').textContent=`${Math.round(view.zoom*100)}%`;canvas.classList.toggle('zoomed',view.zoom>1);$('zoom-reset').title='Reset zoom';}
+function updateZoomControls(){$('zoom-value').textContent=`${Math.round(view.zoom*100)}%`;canvas.classList.toggle('zoomed',view.zoom>1);$('zoom-reset').title='Reset zoom';}
 function setZoom(next,x,y){view.zoomAt(next,x,y);updateZoomControls();draw();}
 $('zoom-in').onclick=()=>setZoom(view.zoom*1.25);$('zoom-out').onclick=()=>setZoom(view.zoom/1.25);$('zoom-reset').onclick=()=>setZoom(1);
 canvas.addEventListener('wheel',event=>{event.preventDefault();const p=screenPoint(event);setZoom(view.zoom*Math.exp(-event.deltaY*.001),p.x,p.y);},{passive:false});
@@ -310,6 +319,7 @@ canvas.addEventListener('pointercancel',()=>{drag=null;panDrag=null;canvas.class
 canvas.addEventListener('lostpointercapture',()=>{if(drag){drag=null;draw();}if(panDrag){panDrag=null;canvas.classList.remove('panning');draw();}});
 canvas.addEventListener('click',event=>{if(suppressClick){suppressClick=false;return;}locateClick(event);});canvas.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();$('play').click();}});
 function updateLabels(){
+  refreshRanges();
   const s=settings(),voice=instrument(travellers[selected].instrument),note=isNoteVoice(travellers[selected].instrument);
   $('q-label').textContent=note?'Decay · selected instrument':'Ring · selected instrument';$('q-value').textContent=note?`≈ ${Math.min(22,bellDecay(s.q)*(voice.tail||1)).toFixed(1)} s`:s.q;$('tuning-value').textContent=`${noteName(s.tuning)} · ${s.tuning} Hz`;
   for(const id of ['delay-time','delay-mix','delay-feedback'])$(id).disabled=!s.delayEnabled;
@@ -341,6 +351,7 @@ async function asDataURL(blob){
   const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));
   return `data:${blob.type||'image/jpeg'};base64,${btoa(binary)}`;
 }
+document.querySelector('label[for=upload]').onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();$('upload').click();}};
 $('upload').onchange=async event=>{const file=event.target.files[0];if(!file)return;await loadImage(await asDataURL(file),file.name);event.target.value='';};
 function download(blob,name){if(downloadURL)URL.revokeObjectURL(downloadURL);downloadURL=URL.createObjectURL(blob);const a=document.createElement('a');a.href=downloadURL;a.download=name;a.click();}
 $('save-score').onclick=async()=>{

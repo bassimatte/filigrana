@@ -3,7 +3,7 @@ import {BellPhrasing} from './music.js';
 import {seededRandom} from './performance.js';
 export const COLOURS=['#d95f36','#337b9a','#91649e'];
 export class Traveller {
-  constructor(id){this.id=id;this.colour=COLOURS[id];this.enabled=true;this.octave=0;this.scale='pentatonic';this.instrument='bell';this.speed=28;this.spacing=2.8;this.volume=.8;this.pan=(id-1)*.35;this.seed='ink-01';this.phrasing=new BellPhrasing();this.setGraph(null);}
+  constructor(id){this.id=id;this.colour=COLOURS[id];this.enabled=true;this.octave=0;this.scale='pentatonic';this.instrument='bell';this.speed=28;this.spacing=2.8;this.volume=.8;this.ring=42;this.pan=(id-1)*.35;this.seed='ink-01';this.phrasing=new BellPhrasing();this.setGraph(null);}
   setGraph(graph){this.graph=graph;this.visits=new Uint32Array(graph?.edges.length||0);this.walker=null;this.origin=null;this.clearPhrase();}
   clearPhrase(){this.phrasing.reset();this.heardPitch=null;this.pulse=0;this.trail=[];this.strikes=0;}
   start(edgeId,from,distance=0){

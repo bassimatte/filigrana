@@ -14,7 +14,7 @@ export function validateComposition(input){
   controls['delay-enabled']=input.controls?.['delay-enabled']!==false;
   controls.seed=typeof input.controls?.seed==='string'?input.controls.seed.slice(0,80):'ink-01';
   return {format:'line-resonator',version:1,image:{src:input.image.src,name:String(input.image.name||'Saved drawing').slice(0,160)},controls,
-    travellers:input.travellers.map((t,i)=>({instrument:Object.hasOwn(INSTRUMENTS,t?.instrument)?t.instrument:'bell',scale:Object.hasOwn(SCALES,t?.scale)?t.scale:'pentatonic',enabled:t?.enabled!==false,octave:Math.round(number(t?.octave,-2,2,0)),speed:number(t?.speed,10,240,28),spacing:number(t?.spacing,.8,12,2.8),volume:number(t?.volume,0,1,.8),pan:number(t?.pan,-1,1,(i-1)*.35),
+    travellers:input.travellers.map((t,i)=>({instrument:Object.hasOwn(INSTRUMENTS,t?.instrument)?t.instrument:'bell',scale:Object.hasOwn(SCALES,t?.scale)?t.scale:'pentatonic',enabled:t?.enabled!==false,octave:Math.round(number(t?.octave,-2,2,0)),speed:number(t?.speed,10,240,28),spacing:number(t?.spacing,.8,12,2.8),volume:number(t?.volume,0,1,.8),ring:number(t?.ring,3,65,controls.q),pan:number(t?.pan,-1,1,(i-1)*.35),
       origin:t?.origin?{edgeId:Math.floor(number(t.origin.edgeId,0,1e6,0)),from:Math.floor(number(t.origin.from,0,1e6,0)),distance:number(t.origin.distance,0,1e6,0),x:number(t.origin.x,0,1,.5),y:number(t.origin.y,0,1,.5)}:null})),
     graph:{w:number(input.graph?.w,1,960,1),h:number(input.graph?.h,1,960,1),edges:number(input.graph?.edges,0,1e6,0)}};
 }

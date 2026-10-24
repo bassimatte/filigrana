@@ -14,6 +14,6 @@ export const PRESETS={
 export function matchingPreset(voices,controls){
   return Object.keys(PRESETS).find(key=>{
     const p=PRESETS[key];
-    return ['room','ring','pace','gap'].every(field=>controls[field]===p[field])&&voices.length===3&&voices.every((v,i)=>v.instrument===p.keys[i]&&v.octave===p.octaves[i]&&v.speed===p.speeds[i]&&v.spacing===p.spacing[i]&&v.volume===p.volumes[i]&&v.pan===(i-1)*.4&&v.scale==='pentatonic');
+    return ['room','pace','gap'].every(field=>controls[field]===p[field])&&voices.length===3&&voices.every((v,i)=>(v.ring??controls.ring)===p.ring&&v.instrument===p.keys[i]&&v.octave===p.octaves[i]&&v.speed===p.speeds[i]&&v.spacing===p.spacing[i]&&v.volume===p.volumes[i]&&v.pan===(i-1)*.4&&v.scale==='pentatonic');
   })||'custom';
 }

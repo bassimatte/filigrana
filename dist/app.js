@@ -9,7 +9,7 @@ import {bellPitch,bellDecay,curvature,noteName,tunePitch,SCALES} from './music.j
 import {Traveller,defaultStarts} from './traveller.js?v=2';
 import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=6';
 import {Conversation,pieceEnvelope} from './performance.js';
-import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=8';
+import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=9';
 const icon=name=>`<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-${name}"/></svg>`;
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
@@ -76,7 +76,7 @@ function refreshPalette(){
 }
 document.addEventListener('filigrana-theme-change',refreshPalette);
 
-const settings=()=>({speed:+$('speed').value/100,tuning:+$('tuning').value,q:+$('q').value,volume:+$('volume').value/100,mode:$('branch').value,interaction:$('interaction').value,gap:+$('response-gap').value,duration:+$('duration').value,room:+$('room').value/100,delayTime:+$('delay-time').value/1000,delayMix:+$('delay-mix').value/100,delayFeedback:+$('delay-feedback').value/100,delayEnabled:$('delay-enabled').checked});
+const settings=()=>({speed:+$('speed').value/100,tuning:+$('tuning').value,volume:+$('volume').value/100,mode:$('branch').value,interaction:$('interaction').value,gap:+$('response-gap').value,duration:+$('duration').value,room:+$('room').value/100,delayTime:+$('delay-time').value/1000,delayMix:+$('delay-mix').value/100,delayFeedback:+$('delay-feedback').value/100,delayEnabled:$('delay-enabled').checked});
 function updateEffects(){const s=settings();audio.setRoom(s.room);audio.setDelay(s.delayTime,s.delayMix,s.delayFeedback,s.delayEnabled);}
 const active=()=>travellers.filter(t=>t.enabled&&t.walker);
 function message(text=''){$('message').textContent=text;$('message').hidden=!text;}
@@ -86,9 +86,9 @@ function perform(t,note){
   if(s.interaction==='conversation'&&lastSpeaker!==null&&lastSpeaker!==t.id&&!isNoteVoice(travellers[lastSpeaker].instrument))audio.silenceChannel(lastSpeaker);
   audio.setTraveller(t.id,t.volume,t.pan);
   if(note.type==='note'){
-    if(!audio.strike(note.hz,s.q,0,note.bend,t.id,t.instrument))return;
+    if(!audio.strike(note.hz,t.ring,0,note.bend,t.id,t.instrument))return;
     t.strikes++;
-  }else{audio.tune(note.hz,s.q,t.id);audio.exciteEdge(t.instrument,note.duration,t.id);}
+  }else{audio.tune(note.hz,t.ring,t.id);audio.exciteEdge(t.instrument,note.duration,t.id);}
   t.heardPitch=note.hz;t.pulse=1;lastSpeaker=t.id;pulseVoice(t.id);
   if(visualMode==='threads')threadLights.emit(graph,t.id,t.walker.edge,t.walker.from,t.walker.distance,visualNow());
 }
@@ -133,8 +133,10 @@ function paintRange(input){const min=+(input.getAttribute('min')||0),max=+(input
 function refreshRanges(){document.querySelectorAll('input[type=range]').forEach(paintRange);}
 function syncTraveller(t){
   for(const key of ['instrument','octave','scale'])$(`${key}-${t.id}`).value=t[key];$(`enabled-${t.id}`).checked=t.enabled;
-  for(const [key,value,unit]of [['speed',t.speed,' px/s'],['spacing',t.spacing,' s'],['volume',Math.round(t.volume*100),'%'],['pan',Math.round(t.pan*100),'']]){
-    $(`expression-${key}-${t.id}`).value=value;paintRange($(`expression-${key}-${t.id}`));$(`expression-${key}-value-${t.id}`).textContent=key==='pan'?(value===0?'Center':`${Math.abs(value)}% ${value<0?'L':'R'}`):value+unit;
+  const ringLabel=isNoteVoice(t.instrument)?'Decay':'Ring';$(`expression-ring-label-${t.id}`).textContent=ringLabel;
+  const ringValue=isNoteVoice(t.instrument)?`${Math.min(22,bellDecay(t.ring)*(instrument(t.instrument).tail||1)).toFixed(1)} s`:String(t.ring);
+  for(const [key,value,unit]of [['speed',t.speed,' px/s'],['spacing',t.spacing,' s'],['volume',Math.round(t.volume*100),'%'],['ring',t.ring,ringValue],['pan',Math.round(t.pan*100),'']]){
+    $(`expression-${key}-${t.id}`).value=value;paintRange($(`expression-${key}-${t.id}`));$(`expression-${key}-value-${t.id}`).textContent=key==='pan'?(value===0?'Center':`${Math.abs(value)}% ${value<0?'L':'R'}`):key==='ring'?unit:value+unit;
   }
 }
 function mountTravellers(){
@@ -146,7 +148,7 @@ function mountTravellers(){
       <label for="octave-${t.id}">Octave</label><select id="octave-${t.id}" aria-label="Octave for voice ${t.id+1}">${[-2,-1,0,1,2].map(o=>`<option value="${o}" ${o===0?'selected':''}>${o>0?'+':''}${o}${o===0?' · original':''}</option>`).join('')}</select>
       <label for="scale-${t.id}">Tuning</label><select id="scale-${t.id}" aria-label="Tuning for voice ${t.id+1}">${Object.entries(SCALES).map(([key,s])=>`<option value="${key}">${s.label}</option>`).join('')}</select></div>
       <p class="traveller-note" id="traveller-note-${t.id}">Waiting for ink…</p>
-      <details class="traveller-expression"><summary>Expression <span>${icon('plus')}</span></summary>${[['speed','Speed',10,240,1],['spacing','Note spacing',.8,12,.1],['volume','Volume',0,100,1],['pan','Stereo',-100,100,1]].map(([key,label,min,max,step])=>`<label for="expression-${key}-${t.id}">${label}<output id="expression-${key}-value-${t.id}"></output></label><input id="expression-${key}-${t.id}" aria-label="${label} for voice ${t.id+1}" type="range" min="${min}" max="${max}" step="${step}">`).join('')}</details>`;
+      <details class="traveller-expression"><summary>Expression <span>${icon('plus')}</span></summary>${[['speed','Speed',10,240,1],['spacing','Note spacing',.8,12,.1],['volume','Volume',0,100,1],['ring','Decay',3,65,1],['pan','Stereo',-100,100,1]].map(([key,label,min,max,step])=>`<label for="expression-${key}-${t.id}"><span${key==='ring'?` id="expression-ring-label-${t.id}"`:''}>${label}</span><output id="expression-${key}-value-${t.id}"></output></label><input id="expression-${key}-${t.id}" aria-label="${label} for voice ${t.id+1}" type="range" min="${min}" max="${max}" step="${step}">`).join('')}</details>`;
     $('travellers').append(card);
     const chip=document.createElement('div');chip.className='voice-chip';chip.style.setProperty('--traveller',`var(--voice-${t.id+1})`);
     chip.innerHTML=`<button type="button" class="voice-button" id="voice-${t.id}" aria-expanded="false" aria-controls="traveller-${t.id}" aria-label="Voice ${t.id+1} settings"><span class="voice-number" aria-hidden="true"><i class="voice-light" id="voice-light-${t.id}"></i></span><span class="voice-copy"><strong>Voice ${t.id+1}</strong><span id="voice-name-${t.id}"></span></span></button><button type="button" class="voice-mute" id="mute-${t.id}" aria-pressed="false" aria-label="Mute voice ${t.id+1}">On</button>`;
@@ -154,14 +156,15 @@ function mountTravellers(){
     $(`voice-${t.id}`).onclick=()=>selectVoice(t.id,true);
     $(`mute-${t.id}`).onclick=()=>{$(`enabled-${t.id}`).checked=!t.enabled;$(`enabled-${t.id}`).onchange();};
     syncTraveller(t);
-    for(const key of ['speed','spacing','volume','pan'])$(`expression-${key}-${t.id}`).oninput=()=>{
+    for(const key of ['speed','spacing','volume','ring','pan'])$(`expression-${key}-${t.id}`).oninput=()=>{
       const value=+$(`expression-${key}-${t.id}`).value;t[key]=['pan','volume'].includes(key)?value/100:value;
       if(key==='spacing'){t.phrasing.next=totalTime+t.spacing*(instrument(t.instrument).spacing||1);conversation.remove(t.id);}
+      if(key==='ring'&&playing&&t.enabled&&t.walker&&!isNoteVoice(t.instrument))audio.tune(pitch(t,graph.edges[t.walker.edge]),t.ring,t.id);
       audio.setTraveller(t.id,t.volume,t.pan);syncTraveller(t);
     };
     $(`place-${t.id}`).onclick=()=>{selected=t.id;openVoice=null;uiState();updateLabels();draw();canvas.focus();message('Click a line to set this voice’s start.');};
     $(`instrument-${t.id}`).onchange=()=>{
-      audio.silenceChannel(t.id);conversation.remove(t.id);t.instrument=$(`instrument-${t.id}`).value;t.phrasing.reset();t.heardPitch=null;updateLabels();soundEdge(t);voiceOverview();draw();
+      audio.silenceChannel(t.id);conversation.remove(t.id);t.instrument=$(`instrument-${t.id}`).value;t.phrasing.reset();t.heardPitch=null;syncTraveller(t);updateLabels();soundEdge(t);voiceOverview();draw();
       message();
     };
     $(`enabled-${t.id}`).onchange=()=>{
@@ -172,7 +175,7 @@ function mountTravellers(){
     for(const kind of ['octave','scale'])$(`${kind}-${t.id}`).onchange=()=>{
       t[kind]=kind==='octave'?+$(`${kind}-${t.id}`).value:$(`${kind}-${t.id}`).value;
       conversation.remove(t.id);
-      if(playing&&t.enabled&&t.walker&&!isNoteVoice(t.instrument)){const hz=pitch(t,graph.edges[t.walker.edge]);audio.tune(hz,settings().q,t.id);t.heardPitch=hz;}
+      if(playing&&t.enabled&&t.walker&&!isNoteVoice(t.instrument)){const hz=pitch(t,graph.edges[t.walker.edge]);audio.tune(hz,t.ring,t.id);t.heardPitch=hz;}
       draw();message();
     };
   }
@@ -314,27 +317,26 @@ canvas.addEventListener('lostpointercapture',()=>{if(drag){drag=null;draw();}if(
 canvas.addEventListener('click',event=>{if(suppressClick){suppressClick=false;return;}locateClick(event);});canvas.addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();$('play').click();}});
 function updateLabels(){
   refreshRanges();
-  const s=settings(),voice=instrument(travellers[selected].instrument),note=isNoteVoice(travellers[selected].instrument);
-  $('q-label').textContent=note?'Decay · selected instrument':'Ring · selected instrument';$('q-value').textContent=note?`≈ ${Math.min(22,bellDecay(s.q)*(voice.tail||1)).toFixed(1)} s`:s.q;$('tuning-value').textContent=`${noteName(s.tuning)} · ${s.tuning} Hz`;
+  const s=settings();$('tuning-value').textContent=`${noteName(s.tuning)} · ${s.tuning} Hz`;
   for(const id of ['delay-time','delay-mix','delay-feedback'])$(id).disabled=!s.delayEnabled;
   $('response-gap').disabled=s.interaction!=='conversation';
 }
-for(const [id,unit] of [['speed','%'],['tuning',' Hz'],['q',''],['volume','%'],['sensitivity',''],['response-gap',' s'],['room','%'],['delay-time',' ms'],['delay-mix','%'],['delay-feedback','%']])$(id).oninput=()=>{
+for(const [id,unit] of [['speed','%'],['tuning',' Hz'],['volume','%'],['sensitivity',''],['response-gap',' s'],['room','%'],['delay-time',' ms'],['delay-mix','%'],['delay-feedback','%']])$(id).oninput=()=>{
   $(`${id}-value`).textContent=$(id).value+unit;const s=settings();updateLabels();updateEffects();if(playing)audio.setVolume(s.volume);
-  if(graph){for(const t of active())if(!isNoteVoice(t.instrument)){const hz=pitch(t,graph.edges[t.walker.edge]);audio.tune(hz,s.q,t.id);t.heardPitch=playing?hz:null;}draw();}
+  if(id==='tuning'&&graph){for(const t of active())if(!isNoteVoice(t.instrument)){const hz=pitch(t,graph.edges[t.walker.edge]);audio.tune(hz,t.ring,t.id);t.heardPitch=playing?hz:null;}draw();}
 };
 $('delay-enabled').onchange=()=>{updateLabels();updateEffects();};
 $('interaction').onchange=()=>{audio.silence();conversation.reset();lastSpeaker=null;updateLabels();if(playing){audio.setVolume(settings().volume*pieceEnvelope(totalTime,settings().duration).gain);for(const t of active()){t.phrasing.reset();soundEdge(t);}answer();}};
 $('seed').onchange=()=>{const value=Number($('seed').value);$('seed').value=String(Number.isFinite(value)?Math.max(0,Math.min(2147483647,Math.round(value))):1);message('The new journey seed will apply when you press Restart.');};
 function applyPreset(key){
   const mood=PRESETS[key];audio.silence();conversation.reset();lastSpeaker=null;
-  for(const t of travellers){t.instrument=mood.keys[t.id];t.octave=mood.octaves[t.id];t.speed=mood.speeds[t.id];t.spacing=mood.spacing[t.id];t.volume=mood.volumes[t.id];t.pan=(t.id-1)*.4;t.scale='pentatonic';t.phrasing.reset();t.heardPitch=null;syncTraveller(t);audio.setTraveller(t.id,t.volume,t.pan);}
-  for(const [id,value,unit]of [['room',mood.room,'%'],['q',mood.ring,''],['speed',mood.pace,'%'],['response-gap',mood.gap,' s']]){$(id).value=value;$(`${id}-value`).textContent=value+unit;}
+  for(const t of travellers){t.instrument=mood.keys[t.id];t.octave=mood.octaves[t.id];t.speed=mood.speeds[t.id];t.spacing=mood.spacing[t.id];t.volume=mood.volumes[t.id];t.ring=mood.ring;t.pan=(t.id-1)*.4;t.scale='pentatonic';t.phrasing.reset();t.heardPitch=null;syncTraveller(t);audio.setTraveller(t.id,t.volume,t.pan);}
+  for(const [id,value,unit]of [['room',mood.room,'%'],['speed',mood.pace,'%'],['response-gap',mood.gap,' s']]){$(id).value=value;$(`${id}-value`).textContent=value+unit;}
   $('preset').value=key;
   updateEffects();updateLabels();voiceOverview();
   if(playing){audio.setVolume(settings().volume*pieceEnvelope(totalTime,settings().duration).gain);for(const t of active())soundEdge(t);answer();}draw();
 }
-function customMood(){$('preset').value=matchingPreset(travellers,{room:+$('room').value,ring:+$('q').value,pace:+$('speed').value,gap:+$('response-gap').value});}
+function customMood(){$('preset').value=matchingPreset(travellers,{room:+$('room').value,pace:+$('speed').value,gap:+$('response-gap').value});}
 $('preset').innerHTML=Object.entries(PRESETS).map(([key,p])=>`<option value="${key}">${key==='still'?'Still · calm trio':p.name}</option>`).join('')+'<option value="custom" disabled>Custom</option>';
 $('preset').onchange=()=>{if(Object.hasOwn(PRESETS,$('preset').value)){applyPreset($('preset').value);message();}};
 $('load-score-trigger').onclick=()=>$('load-score').click();
@@ -358,11 +360,11 @@ $('save-score').onclick=async()=>{
   if(!image||!graph?.edges.length||busy)return;$('save-score').disabled=true;
   try{
     const src=image.src.startsWith('data:')?image.src:await asDataURL(await (await fetch(image.src)).blob()),controls={};
-    for(const key of Object.keys(CONTROL_LIMITS))controls[key]=+$(key).value;
+    for(const key of Object.keys(CONTROL_LIMITS))if(key!=='q')controls[key]=+$(key).value;
     Object.assign(controls,{branch:$('branch').value,interaction:$('interaction').value,duration:+$('duration').value,seed:$('seed').value,'delay-enabled':$('delay-enabled').checked});
     const score={format:'line-resonator',version:1,image:{src,name:$('image-name').textContent},controls,graph:{w:graph.w,h:graph.h,edges:graph.edges.length},travellers:travellers.map(t=>{
-      const {instrument,scale,enabled,octave,speed,spacing,volume,pan}=t,e=graph.edges[t.origin.edgeId],reverse=e.b===t.origin.from&&e.a!==t.origin.from,p=pointOnEdge(e,reverse?e.length-t.origin.distance:t.origin.distance);
-      return {instrument,scale,enabled,octave,speed,spacing,volume,pan,origin:{...t.origin,x:p.x/graph.w,y:p.y/graph.h}};
+      const {instrument,scale,enabled,octave,speed,spacing,volume,ring,pan}=t,e=graph.edges[t.origin.edgeId],reverse=e.b===t.origin.from&&e.a!==t.origin.from,p=pointOnEdge(e,reverse?e.length-t.origin.distance:t.origin.distance);
+      return {instrument,scale,enabled,octave,speed,spacing,volume,ring,pan,origin:{...t.origin,x:p.x/graph.w,y:p.y/graph.h}};
     })};
     validateComposition(score);download(new Blob([JSON.stringify(score)],{type:'application/json'}),'filigrana.line-score.json');message('Composition saved.');
   }catch(error){message(`Could not save the composition: ${error.message}`);}finally{uiState();}
@@ -372,8 +374,8 @@ $('load-score').onchange=async event=>{
   try{
     if(file.size>36e6)throw new Error('Choose a composition smaller than 36 MB.');
     const score=validateComposition(JSON.parse(await file.text()));stop();
-    for(const [key,value]of Object.entries(score.controls)){if(key==='delay-enabled')$(key).checked=value;else if(key==='seed')$(key).value=String(numericSeed(value));else $(key).value=value;}
-    const units={speed:'%',tuning:' Hz',q:'',volume:'%',sensitivity:'',room:'%','delay-time':' ms','delay-feedback':'%','delay-mix':'%','response-gap':' s'};
+    for(const [key,value]of Object.entries(score.controls)){if(key==='delay-enabled')$(key).checked=value;else if(key==='seed')$(key).value=String(numericSeed(value));else if(key!=='q')$(key).value=value;}
+    const units={speed:'%',tuning:' Hz',volume:'%',sensitivity:'',room:'%','delay-time':' ms','delay-feedback':'%','delay-mix':'%','response-gap':' s'};
     for(const [key,unit]of Object.entries(units))$(`${key}-value`).textContent=$(key).value+unit;
     for(const t of travellers){const {origin,...expression}=score.travellers[t.id];Object.assign(t,expression);t.seed=String(numericSeed(score.controls.seed));syncTraveller(t);}
     await loadImage(score.image.src,score.image.name);

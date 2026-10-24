@@ -9,7 +9,7 @@ import {bellPitch,bellDecay,curvature,noteName,tunePitch,SCALES} from './music.j
 import {Traveller,defaultStarts} from './traveller.js?v=2';
 import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=6';
 import {Conversation,pieceEnvelope} from './performance.js';
-import {CONTROL_LIMITS,validateComposition} from './composition.js?v=7';
+import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=8';
 const icon=name=>`<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-${name}"/></svg>`;
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
@@ -372,10 +372,10 @@ $('load-score').onchange=async event=>{
   try{
     if(file.size>36e6)throw new Error('Choose a composition smaller than 36 MB.');
     const score=validateComposition(JSON.parse(await file.text()));stop();
-    for(const [key,value]of Object.entries(score.controls)){if(key==='delay-enabled')$(key).checked=value;else $(key).value=value;}
+    for(const [key,value]of Object.entries(score.controls)){if(key==='delay-enabled')$(key).checked=value;else if(key==='seed')$(key).value=String(numericSeed(value));else $(key).value=value;}
     const units={speed:'%',tuning:' Hz',q:'',volume:'%',sensitivity:'',room:'%','delay-time':' ms','delay-feedback':'%','delay-mix':'%','response-gap':' s'};
     for(const [key,unit]of Object.entries(units))$(`${key}-value`).textContent=$(key).value+unit;
-    for(const t of travellers){const {origin,...expression}=score.travellers[t.id];Object.assign(t,expression);t.seed=score.controls.seed;syncTraveller(t);}
+    for(const t of travellers){const {origin,...expression}=score.travellers[t.id];Object.assign(t,expression);t.seed=String(numericSeed(score.controls.seed));syncTraveller(t);}
     await loadImage(score.image.src,score.image.name);
     if(image?.src!==score.image.src||!graph?.edges.length)throw new Error('The saved image could not be read.');
     for(const t of travellers){

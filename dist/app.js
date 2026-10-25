@@ -38,7 +38,7 @@ $('visual-mode').value=visualMode;
 function applyVisualMode(){ hoverVoice=null;$('canvas-wrap').classList.toggle('luminous',visualMode==='threads');document.documentElement.classList.toggle('luminous-mode',visualMode==='threads');paintPaths();draw(); }
 applyVisualMode();
 $('visual-mode').onchange=()=>{visualMode=$('visual-mode').value;try{localStorage.setItem('filigrana-visual-mode',visualMode);}catch{}applyVisualMode();};
-let recorder=null,pendingRecorder=null,recordPreparing=false,recordSaving=false,recordGeneration=0;
+let recorder=null,pendingRecorder=null,recordPreparing=false,recordSaving=false,recordGeneration=0,recordingStartedAt=0,recordingElapsed=0;
 try{const saved=localStorage.getItem('filigrana-recording-format');if(['mp3','wav'].includes(saved))$('record-format').value=saved;}catch{}
 function recordingInfo(){
   const rate=(Math.min($('record-format').value==='mp3'?48000:192000,audio.ctx?.sampleRate||48000)/1000).toLocaleString('en-US',{maximumFractionDigits:1});
@@ -103,14 +103,16 @@ function updateEffects(){const s=settings();audio.setRoom(s.room);audio.setDelay
 const active=()=>travellers.filter(t=>t.enabled&&t.walker);
 function message(text=''){$('message').textContent=text;$('message').hidden=!text;}
 function pitch(t,edge){const s=settings();return isNoteVoice(t.instrument)?bellPitch(edge.length,graph,s.tuning,t.scale,t.octave):tunePitch(resonance(edge,graph,s.tuning),s.tuning,t.scale,t.octave,28,96);}
+function pathBend(edge,t){const distance=t.walker?.reverse?edge.length-t.walker.distance:t.walker?.distance||0;return Math.min(1,Math.sqrt(curvature(edge,distance))*1.25);}
+function pathRing(t,edge){const relative=edge.length/Math.max(1,Math.hypot(graph.w,graph.h)),factor=.72+.56*Math.sqrt(Math.max(.1,Math.min(2,relative/.12)));return Math.max(3,Math.min(65,(bellDecay(t.ring)*factor-3)*6.5));}
 function perform(t,note){
   const s=settings();if(!t.enabled||!t.walker)return;
   if(s.interaction==='conversation'&&lastSpeaker!==null&&lastSpeaker!==t.id&&!isNoteVoice(travellers[lastSpeaker].instrument))audio.silenceChannel(lastSpeaker);
   audio.setTraveller(t.id,t.volume,t.pan);
   if(note.type==='note'){
-    if(!audio.strike(note.hz,t.ring,0,note.bend,t.id,t.instrument))return;
+    if(!audio.strike(note.hz,note.ring??t.ring,0,note.bend,t.id,t.instrument))return;
     t.strikes++;
-  }else{audio.tune(note.hz,t.ring,t.id);audio.exciteEdge(t.instrument,note.duration,t.id);}
+  }else{audio.tune(note.hz,Math.min(65,t.ring*(.8+pathBend(graph.edges[t.walker.edge],t)*.45)),t.id);audio.exciteEdge(t.instrument,note.duration,t.id);}
   t.heardPitch=note.hz;t.pulse=1;lastSpeaker=t.id;pulseVoice(t.id);
   if(visualMode!=='trace')threadLights.emit(graph,t.id,t.walker.edge,t.walker.from,t.walker.distance,visualNow());
 }
@@ -128,7 +130,7 @@ function soundEdge(t){
   let note;
   if(isNoteVoice(t.instrument)){
     const hz=t.phrasing.visit(e,totalTime,graph,s.tuning,t.spacing*(instrument(t.instrument).spacing||1),t.scale,t.octave);
-    if(hz===null)return;note={type:'note',hz,bend:curvature(e)};
+    if(hz===null)return;note={type:'note',hz,bend:pathBend(e,t),ring:pathRing(t,e)};
   }else{
     note={type:'resonance',hz:pitch(t,e),duration:(e.length-t.walker.distance)/(t.speed*s.speed*pieceEnvelope(totalTime,s.duration).pace)};
   }
@@ -138,7 +140,7 @@ function uiState(){
   $('play-label').textContent=playing?'Pause':recordPreparing?'Cancel':finished?'Listen again':'Listen';$('play-icon').innerHTML=icon(playing?'pause':recordPreparing?'close':'play');
   $('state').textContent=busy?'ANALYSING':!image?'UPLOAD DRAWING':playing?`${active().length} TRAVELLING`:finished?'FINISHED':graph?.edges.length?'READY':'NO PATHS';
   $('play').disabled=busy||!active().length;$('reset').disabled=busy||!travellers.some(t=>t.origin);$('record').disabled=recordPreparing||recordSaving||busy||!active().length||!canRecord();
-  $('record-label').textContent=recordPreparing?'Preparing…':recordSaving?'Saving…':recording?'Save recording':'Record';$('record-icon').innerHTML=icon(recordPreparing||recordSaving?'loader':recording?'stop':'record');$('record').setAttribute('aria-pressed',String(recording));$('record').setAttribute('aria-busy',String(recordPreparing||recordSaving));$('record-indicator').hidden=!recording;recordingInfo();$('record').classList.toggle('recording',recording);$('record').classList.toggle('busy',recordPreparing||recordSaving);
+  $('record-label').textContent=recordPreparing?'Preparing…':recordSaving?'Saving…':recording?'Save recording':'Record';$('record-icon').innerHTML=icon(recordPreparing||recordSaving?'loader':recording?'stop':'record');$('record').setAttribute('aria-pressed',String(recording));$('record').setAttribute('aria-busy',String(recordPreparing||recordSaving));$('record-indicator').hidden=!recording;$('recording-monitor').hidden=!recording&&!recordSaving;recordingInfo();$('record').classList.toggle('recording',recording);$('record').classList.toggle('busy',recordPreparing||recordSaving);
   $('save-score').disabled=busy||!image||!graph?.edges.length;
   for(const t of travellers){
     $(`traveller-${t.id}`).classList.toggle('selected',t.id===selected);$(`traveller-${t.id}`).classList.toggle('inactive',!t.enabled);
@@ -311,7 +313,7 @@ function advanceMusic(dt){
   totalTime+=dt;lastThreadMotion=visualNow();musicDirty=true;const s=settings(),form=pieceEnvelope(totalTime,s.duration);
   if(form.finished){finished=true;stop();message();return;}
   audio.setVolume(s.volume*form.gain);
-  for(const t of travellers){t.advance(dt,t.speed*s.speed*form.pace,s.mode,(voice,transition)=>{if(graph.nodes[transition.nodeId]?.edges.length>=3)threadLights.emitJunction(graph,voice.id,transition.nodeId,visualNow());soundEdge(voice);});if(t.enabled&&t.walker&&isNoteVoice(t.instrument)){const e=graph.edges[t.walker.edge];audio.colour(curvature(e,t.walker.reverse?e.length-t.walker.distance:t.walker.distance),t.id);}}
+  for(const t of travellers){t.advance(dt,t.speed*s.speed*form.pace,s.mode,(voice,transition)=>{if(graph.nodes[transition.nodeId]?.edges.length>=3)threadLights.emitJunction(graph,voice.id,transition.nodeId,visualNow());soundEdge(voice);});if(t.enabled&&t.walker&&isNoteVoice(t.instrument)){const e=graph.edges[t.walker.edge];audio.colour(pathBend(e,t),t.id);}}
   if(form.acceptNotes)answer();else conversation.pending.clear();
   if(!active().length)stop();
 }
@@ -324,6 +326,13 @@ function frame(){
   sx.clearRect(0,0,scope.width,scope.height);sx.strokeStyle=palette.green;sx.lineWidth=1.5;sx.beginPath();
   if(audio.analyser&&playing){const data=new Uint8Array(audio.analyser.fftSize);audio.analyser.getByteTimeDomainData(data);for(let i=0;i<data.length;i++){const x=i/(data.length-1)*scope.width,y=scope.height/2+(data[i]-128)/128*scope.height*.46;i?sx.lineTo(x,y):sx.moveTo(x,y);}}
   else{sx.moveTo(0,scope.height/2);sx.lineTo(scope.width,scope.height/2);}sx.stroke();requestAnimationFrame(frame);
+  if(recording||recordSaving)drawRecordingMonitor();
+}
+function drawRecordingMonitor(){
+  const canvas=$('recording-waveform'),context=canvas.getContext('2d'),width=canvas.width,height=canvas.height;context.clearRect(0,0,width,height);context.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#a94c2c';context.lineWidth=1.5;context.beginPath();
+  const data=new Uint8Array(audio.analyser?.fftSize||128);if(recording&&audio.analyser)audio.analyser.getByteTimeDomainData(data);else data.fill(128);
+  for(let i=0;i<data.length;i++){const x=i/(data.length-1)*width,y=height/2+(data[i]-128)/128*height*.42;i?context.lineTo(x,y):context.moveTo(x,y);}context.stroke();
+  const elapsed=recording?recordingElapsed+(performance.now()-recordingStartedAt)/1000:recordingElapsed,total=Math.floor(elapsed),minutes=String(Math.floor(total/60)).padStart(2,'0'),seconds=String(total%60).padStart(2,'0');$('recording-elapsed').textContent=`${minutes}:${seconds}`;
 }
 function startPlayback(){
   if(finished)restart();playing=true;playbackClock.start();const s=settings();conversation.reset();lastSpeaker=null;
@@ -411,23 +420,25 @@ async function asDataURL(blob){
   const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));
   return `data:${blob.type||'image/jpeg'};base64,${btoa(binary)}`;
 }
+async function compositionSnapshot(){
+  const drawingBlob=await(await fetch(image.src)).blob(),src=image.src.startsWith('data:')?image.src:await asDataURL(drawingBlob),controls={};
+  for(const key of Object.keys(CONTROL_LIMITS))if(key!=='q')controls[key]=+$(key).value;
+  Object.assign(controls,{branch:$('branch').value,interaction:$('interaction').value,duration:+$('duration').value,seed:$('seed').value,'delay-enabled':$('delay-enabled').checked});
+  const score={format:'line-resonator',version:1,image:{src,name:$('image-name').textContent},controls,graph:{w:graph.w,h:graph.h,edges:graph.edges.length},travellers:travellers.map(t=>{
+    const {instrument,scale,enabled,octave,speed,spacing,volume,ring,pan}=t,e=graph.edges[t.origin.edgeId],reverse=e.b===t.origin.from&&e.a!==t.origin.from,p=pointOnEdge(e,reverse?e.length-t.origin.distance:t.origin.distance);
+    return {instrument,scale,enabled,octave,speed,spacing,volume,ring,pan,origin:{...t.origin,x:p.x/graph.w,y:p.y/graph.h}};
+  })};
+  validateComposition(score);return {score,drawingBlob};
+}
+function drawingFilename(blob){let name=$('image-name').textContent.split(/[\\/]/).pop().replace(/[<>:\"|?*]/g,'-')||'filigrana-drawing';if(!/\.[a-z0-9]{2,5}$/i.test(name))name+=blob.type==='image/png'?'.png':blob.type==='image/webp'?'.webp':'.jpg';return name;}
 document.querySelector('label[for=upload]').onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();$('upload').click();}};
 $('upload').onchange=async event=>{const file=event.target.files[0];if(!file)return;await loadImage(await asDataURL(file),file.name,55);event.target.value='';};
 function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
 $('save-score').onclick=async()=>{
   if(!image||!graph?.edges.length||busy)return;$('save-score').disabled=true;
   try{
-    const drawingBlob=await (await fetch(image.src)).blob(),src=image.src.startsWith('data:')?image.src:await asDataURL(drawingBlob),controls={};
-    for(const key of Object.keys(CONTROL_LIMITS))if(key!=='q')controls[key]=+$(key).value;
-    Object.assign(controls,{branch:$('branch').value,interaction:$('interaction').value,duration:+$('duration').value,seed:$('seed').value,'delay-enabled':$('delay-enabled').checked});
-    const score={format:'line-resonator',version:1,image:{src,name:$('image-name').textContent},controls,graph:{w:graph.w,h:graph.h,edges:graph.edges.length},travellers:travellers.map(t=>{
-      const {instrument,scale,enabled,octave,speed,spacing,volume,ring,pan}=t,e=graph.edges[t.origin.edgeId],reverse=e.b===t.origin.from&&e.a!==t.origin.from,p=pointOnEdge(e,reverse?e.length-t.origin.distance:t.origin.distance);
-      return {instrument,scale,enabled,octave,speed,spacing,volume,ring,pan,origin:{...t.origin,x:p.x/graph.w,y:p.y/graph.h}};
-    })};
-    validateComposition(score);download(new Blob([JSON.stringify(score)],{type:'application/json'}),'filigrana.line-score.json');
-    let drawingName=$('image-name').textContent.split(/[\\/]/).pop().replace(/[<>:"|?*]/g,'-')||'filigrana-drawing';
-    if(!/\.[a-z0-9]{2,5}$/i.test(drawingName))drawingName+=drawingBlob.type==='image/png'?'.png':drawingBlob.type==='image/webp'?'.webp':'.jpg';
-    download(drawingBlob,drawingName);message('Composition and image saved.');
+    const {score,drawingBlob}=await compositionSnapshot();download(new Blob([JSON.stringify(score)],{type:'application/json'}),'filigrana.line-score.json');
+    download(drawingBlob,drawingFilename(drawingBlob));message('Composition and image saved.');
   }catch(error){message(`Could not save the composition: ${error.message}`);}finally{uiState();}
 };
 $('load-score').onchange=async event=>{
@@ -451,27 +462,32 @@ $('load-score').onchange=async event=>{
   }catch(error){message(`Could not load the composition: ${error.message}`);}finally{event.target.value='';uiState();}
 };
 function cancelRecordingPreparation(){recordGeneration++;pendingRecorder?.cancel();pendingRecorder=null;recordPreparing=false;message();}
-function endRecording(){if(!recording)return;recording=false;recordSaving=true;uiState();message('Saving recording…');recorder.stop();}
+function endRecording(){if(!recording)return;recordingElapsed+=(performance.now()-recordingStartedAt)/1000;recordingStartedAt=0;recording=false;recordSaving=true;uiState();message('Saving recording…');recorder.stop();}
 $('record').onclick=async()=>{
   if(recording){endRecording();return;}
   if(recordPreparing||recordSaving||busy||!active().length||!canRecord())return;
   const shouldStart=!playing,generation=++recordGeneration;let session;
   recordPreparing=true;uiState();message('Preparing recording…');
-  const reset=()=>{recorder=null;pendingRecorder=null;recordPreparing=false;recordSaving=false;recording=false;uiState();};
+  let composition;
+  const reset=()=>{recorder=null;pendingRecorder=null;recordPreparing=false;recordSaving=false;recording=false;recordingStartedAt=0;recordingElapsed=0;uiState();};
   try{
+    composition=await compositionSnapshot();if(generation!==recordGeneration)return;
     await audio.init();await playbackClock.prepare(audio.ctx,audio.master);if(generation!==recordGeneration)return;
     session=new MixRecorder(audio.ctx,audio.master,{
       format:$('record-format').value,
-      onComplete:({blob,extension})=>{
-        if(generation!==recordGeneration)return;reset();
-        download(blob,`filigrana-${new Date().toISOString().slice(0,19).replaceAll(':','-')}.${extension}`);message('Recording saved.');
+      onComplete:async({blob,extension})=>{
+        if(generation!==recordGeneration)return;recording=false;recordSaving=true;uiState();
+        const base=`filigrana-${new Date().toISOString().slice(0,19).replaceAll(':','-')}`;download(blob,`${base}.${extension}`);
+        try{download(new Blob([JSON.stringify(composition.score)],{type:'application/json'}),`${base}.line-score.json`);reset();message('Recording and composition saved. The sidecar includes its drawing.');}
+        catch(error){reset();message(`Recording saved, but its composition sidecar could not be saved: ${error.message}`);}
       },
       onError:error=>{if(generation!==recordGeneration)return;reset();message(`Could not save recording: ${error.message}`);},
-      onLimit:()=>{recording=false;recordSaving=true;uiState();message('Saving recording…');}
+      onLimit:()=>{recordingElapsed+=(performance.now()-recordingStartedAt)/1000;recordingStartedAt=0;recording=false;recordSaving=true;uiState();message('Saving recording…');}
     });
     pendingRecorder=session;await session.start();
     if(generation!==recordGeneration||busy||!active().length||(!shouldStart&&!playing)){session.cancel();if(generation===recordGeneration)reset();return;}
     pendingRecorder=null;recorder=session;recordPreparing=false;recording=true;
+    recordingStartedAt=performance.now();recordingElapsed=0;
     // Capture is connected before the first new note and the musical clock start.
     if(shouldStart)startPlayback();else uiState();message('Recording…');
   }catch(error){

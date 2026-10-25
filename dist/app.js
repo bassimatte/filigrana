@@ -10,7 +10,7 @@ import {bellPitch,bellDecay,curvature,noteName,tunePitch,SCALES} from './music.j
 import {Traveller,defaultStarts} from './traveller.js?v=3';
 import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=7';
 import {Conversation,pieceEnvelope} from './performance.js?v=2';
-import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=10';
+import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=11';
 const icon=name=>`<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-${name}"/></svg>`;
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));

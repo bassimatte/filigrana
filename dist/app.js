@@ -16,7 +16,15 @@ const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContex
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
 let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,visualMode='threads',totalTime=0,loadId=0,pathVector=null,downloadURL=null,finished=false,lastSpeaker=null;
 const view=new DrawingView(),threadLights=new ThreadLights();
-const STARTER_IMAGES=['RP-F-2002-21-4-24.webp','aloe_spirale.jpg','adiantum_pedatum_2006.133.34.55.jpg','IMG_1790 2.JPG','IMG_1791 2.JPG','cacdoha_000082_access.webp','jazz sax.jpeg'];
+const STARTER_IMAGES=[
+  {name:'RP-F-2002-21-4-24.webp',sensitivity:70},
+  {name:'aloe_spirale.jpg',sensitivity:80},
+  {name:'adiantum_pedatum_2006.133.34.55.jpg',sensitivity:70},
+  {name:'IMG_1790 2.JPG',sensitivity:55},
+  {name:'IMG_1791 2.JPG',sensitivity:55},
+  {name:'cacdoha_000082_access.webp',sensitivity:80},
+  {name:'jazz sax.jpeg',sensitivity:80}
+];
 const visualNow=()=>performance.now()/1000;
 let lastThreadMotion=0,hoverVoice=null;
 let drawingWidth=1,drawingHeight=1,panDrag=null;
@@ -191,17 +199,18 @@ $('global-scale').onchange=()=>{
   for(const t of travellers){t.scale=scale;$(`scale-${t.id}`).value=scale;conversation.remove(t.id);if(playing&&t.enabled&&t.walker&&!isNoteVoice(t.instrument)){const hz=pitch(t,graph.edges[t.walker.edge]);audio.tune(hz,t.ring,t.id);t.heardPitch=hz;}}
   syncScaleControl();customMood();draw();message();
 };
-async function loadImage(src,name){
+async function loadImage(src,name,sensitivity=null){
   const id=++loadId;stop();busy=true;uiState();message('Reading the image…');
   try{
+    if(Number.isFinite(sensitivity)){$('sensitivity').value=sensitivity;$('sensitivity-value').textContent=String(sensitivity);paintRange($('sensitivity'));}
     const img=new Image();img.src=src;await img.decode();if(id!==loadId)return;image=img;
     const scale=Math.min(1,960/Math.max(img.width,img.height));drawingWidth=Math.round(img.width*scale);drawingHeight=Math.round(img.height*scale);view.setDrawing(drawingWidth,drawingHeight);updateZoomControls();
     $('image-name').textContent=name;await analyse();
   }catch(e){busy=false;message(`Could not read this image. Try a JPEG or PNG. ${e.message}`);uiState();}
 }
 function loadStarterImage(){
-  const name=STARTER_IMAGES[Math.floor(Math.random()*STARTER_IMAGES.length)];
-  loadImage(new URL(`./images/${encodeURIComponent(name)}`,import.meta.url).href,name);
+  const starter=STARTER_IMAGES[Math.floor(Math.random()*STARTER_IMAGES.length)];
+  loadImage(new URL(`./images/${encodeURIComponent(starter.name)}`,import.meta.url).href,starter.name,starter.sensitivity);
 }
 async function analyse(){
   if(!image)return;stop();threadLights.clear();busy=true;uiState();message('Finding ink, thinning lines, and measuring the paths…');
@@ -371,7 +380,7 @@ async function asDataURL(blob){
   return `data:${blob.type||'image/jpeg'};base64,${btoa(binary)}`;
 }
 document.querySelector('label[for=upload]').onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();$('upload').click();}};
-$('upload').onchange=async event=>{const file=event.target.files[0];if(!file)return;await loadImage(await asDataURL(file),file.name);event.target.value='';};
+$('upload').onchange=async event=>{const file=event.target.files[0];if(!file)return;await loadImage(await asDataURL(file),file.name,55);event.target.value='';};
 function download(blob,name){if(downloadURL)URL.revokeObjectURL(downloadURL);downloadURL=URL.createObjectURL(blob);const a=document.createElement('a');a.href=downloadURL;a.download=name;a.click();}
 $('save-score').onclick=async()=>{
   if(!image||!graph?.edges.length||busy)return;$('save-score').disabled=true;

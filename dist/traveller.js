@@ -26,7 +26,7 @@ export class Traveller {
         const end=pointOnEdge(e,this.walker.reverse?0:e.length),dx=end.x-back.x,dy=end.y-back.y,mag=Math.hypot(dx,dy)||1;
         const next=chooseEdge(this.graph,target,e.id,mode,{x:dx/mag,y:dy/mag},this.random||Math.random,this.visits);
         if(next===null){this.walker=null;return;}
-        this.start(next,target);onEdge(this);
+        this.start(next,target);onEdge(this,{nodeId:target,edgeId:next});
       }
     }
   }

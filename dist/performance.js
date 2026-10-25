@@ -17,8 +17,9 @@ export class Conversation {
   }
 }
 export function pieceEnvelope(time,duration=0){
-  const entrance=.4+.6*Math.min(1,Math.max(0,time)/6);
-  if(!duration)return {gain:entrance,acceptNotes:true,finished:false};
+  const entranceProgress=Math.min(1,Math.max(0,time)/12),entrance=.22+.78*entranceProgress*entranceProgress*(3-2*entranceProgress);
+  if(!duration)return {gain:entrance,pace:1,acceptNotes:true,finished:false};
   const remaining=duration-time,fade=Math.min(20,duration*.2),progress=Math.max(0,Math.min(1,remaining/fade));
-  return {gain:entrance*(.5-.5*Math.cos(Math.PI*progress)),acceptNotes:remaining>Math.min(8,duration*.08),finished:remaining<=0};
+  const development=Math.max(1,duration-fade),arc=Math.sin(Math.PI*Math.max(0,Math.min(1,time/development)));
+  return {gain:entrance*(.78+.22*arc)*(.5-.5*Math.cos(Math.PI*progress)),pace:.88+.12*arc,acceptNotes:remaining>Math.min(8,duration*.08),finished:remaining<=0};
 }

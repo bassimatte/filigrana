@@ -1,4 +1,4 @@
-import {ThreadLights,drawThreads} from './luminous-threads.js?v=18';
+import {ThreadLights,drawThreads} from './luminous-threads.js?v=19';
 import {drawAmbient} from './ambient-views.js?v=3';
 import {DrawingView} from './drawing-view.js?v=12';
 import {PlaybackClock} from './playback-clock.js?v=9';
@@ -7,14 +7,14 @@ import {PRESETS,matchingPreset} from './presets.js?v=7';
 import {inkMask,thin,graphFromSkeleton,resonance,chooseEdge,pointOnEdge} from './geometry.js';
 import {Resonator} from './audio.js?v=7';
 import {bellPitch,bellDecay,curvature,noteName,tunePitch,SCALES} from './music.js';
-import {Traveller,defaultStarts} from './traveller.js?v=2';
+import {Traveller,defaultStarts} from './traveller.js?v=3';
 import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=7';
-import {Conversation,pieceEnvelope} from './performance.js';
+import {Conversation,pieceEnvelope} from './performance.js?v=2';
 import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=10';
 const icon=name=>`<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-${name}"/></svg>`;
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
-let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,visualMode='threads',totalTime=0,loadId=0,pathVector=null,finished=false,lastSpeaker=null;
+let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,visualMode='threads',totalTime=0,loadId=0,pathVector=null,finished=false,lastSpeaker=null,pathFeedback='';
 const view=new DrawingView(),threadLights=new ThreadLights();
 const STARTER_IMAGES=[
   {name:'RP-F-2002-21-4-24.webp',sensitivity:70},
@@ -119,7 +119,7 @@ function soundEdge(t){
     const hz=t.phrasing.visit(e,totalTime,graph,s.tuning,t.spacing*(instrument(t.instrument).spacing||1),t.scale,t.octave);
     if(hz===null)return;note={type:'note',hz,bend:curvature(e)};
   }else{
-    note={type:'resonance',hz:pitch(t,e),duration:(e.length-t.walker.distance)/(t.speed*s.speed)};
+    note={type:'resonance',hz:pitch(t,e),duration:(e.length-t.walker.distance)/(t.speed*s.speed*pieceEnvelope(totalTime,s.duration).pace)};
   }
   if(s.interaction==='conversation')conversation.offer(t.id,note);else perform(t,note);
 }
@@ -200,7 +200,7 @@ $('global-scale').onchange=()=>{
   syncScaleControl();customMood();draw();message();
 };
 async function loadImage(src,name,sensitivity=null){
-  const id=++loadId;stop();busy=true;uiState();message('Reading the image…');
+  const id=++loadId;stop();pathFeedback='';$('suggest-sensitivity').hidden=true;busy=true;uiState();message('Reading the image…');
   try{
     if(Number.isFinite(sensitivity)){$('sensitivity').value=sensitivity;$('sensitivity-value').textContent=String(sensitivity);paintRange($('sensitivity'));}
     const img=new Image();img.src=src;await img.decode();if(id!==loadId)return;image=img;
@@ -213,7 +213,7 @@ function loadStarterImage(){
   loadImage(new URL(`./images/${encodeURIComponent(starter.name)}`,import.meta.url).href,starter.name,starter.sensitivity);
 }
 async function analyse(){
-  if(!image)return;stop();threadLights.clear();busy=true;uiState();message('Finding ink, thinning lines, and measuring the paths…');
+  if(!image)return;stop();threadLights.clear();pathFeedback='';$('suggest-sensitivity').hidden=true;busy=true;uiState();message('Finding ink, thinning lines, and measuring the paths…');
   await new Promise(r=>setTimeout(r,35));
   try{
     const source=document.createElement('canvas');source.width=drawingWidth;source.height=drawingHeight;const sourceContext=source.getContext('2d',{willReadFrequently:true});
@@ -223,12 +223,21 @@ async function analyse(){
     paintPaths();
     $('junction-count').textContent=`${graph.junctions.length} junctions`;
     if(graph.edges.length){
+      const totalPathLength=graph.edges.reduce((sum,edge)=>sum+edge.length,0),density=totalPathLength/(drawingWidth*drawingHeight),sensitivity=+$('sensitivity').value;
+      let suggestion=null;
+      if(graph.edges.length<8||density<.0008)suggestion=Math.min(95,sensitivity+15);
+      else if(graph.edges.length>1200||density>.18)suggestion=Math.max(10,sensitivity-10);
+      $('suggest-sensitivity').hidden=suggestion===null||suggestion===sensitivity;
+      if(!$('suggest-sensitivity').hidden){$('suggest-sensitivity').dataset.value=String(suggestion);$('suggest-sensitivity').textContent=`Try sensitivity ${suggestion}`;}
+      pathFeedback=`${graph.edges.length} paths · ${graph.junctions.length} crossings${suggestion!==null&&suggestion!==sensitivity?` · Try ${suggestion}`:''}`;
       defaultStarts(graph).forEach((start,i)=>travellers[i].place(start.edgeId,start.from,start.distance));
       message();
     }else{
+      const suggestion=Math.min(95,+$('sensitivity').value+15);pathFeedback=suggestion>+$('sensitivity').value?`No paths found · Try sensitivity ${suggestion}`:'No paths found · adjust sensitivity';
+      if(suggestion>+$('sensitivity').value){$('suggest-sensitivity').dataset.value=String(suggestion);$('suggest-sensitivity').textContent=`Try sensitivity ${suggestion}`;$('suggest-sensitivity').hidden=false;}
       message('No usable lines found. Increase ink sensitivity, or try a clearer drawing on plain paper.');$('canvas-note').textContent='No paths detected';$('frequency').textContent='—';$('edge-length').textContent='Try another sensitivity';
     }
-  }catch(e){graph=null;pathVector=null;for(const t of travellers)t.setGraph(null);message(`Could not extract paths: ${e.message}`);}
+  }catch(e){graph=null;pathVector=null;pathFeedback='Path analysis failed';for(const t of travellers)t.setGraph(null);message(`Could not extract paths: ${e.message}`);}
   busy=false;uiState();draw();
 }
 function locateClick(event){
@@ -267,6 +276,13 @@ function draw(){
   }else{
     drawAmbient(ctx,{mode:visualMode,graph,path:pathVector,travellers,scale:view.scale,now:visualNow(),pulses:threadLights.live(visualNow()),lastMotion:lastThreadMotion,playing,hover:hoverVoice,drag,palette,dark:document.documentElement.dataset.theme==='dark',reducedMotion:window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches});
   }
+  const reducedMotion=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+  for(const pulse of threadLights.live(visualNow()))if(pulse.kind==='junction'){
+    const age=Math.max(0,visualNow()-pulse.time),fade=reducedMotion?.32:Math.exp(-age*.72)*.58,colour=travellers[pulse.voice]?.colour||palette.green,radius=(reducedMotion?15:7+age*36)/view.scale;
+    ctx.globalAlpha=fade;ctx.strokeStyle=colour;ctx.lineWidth=(reducedMotion?1:1.25)/view.scale;ctx.beginPath();ctx.arc(pulse.position.x,pulse.position.y,radius,0,Math.PI*2);ctx.stroke();
+    if(!reducedMotion){ctx.globalAlpha=fade*.55;ctx.beginPath();ctx.arc(pulse.position.x,pulse.position.y,Math.max(2,radius-8/view.scale),0,Math.PI*2);ctx.stroke();}
+  }
+  ctx.globalAlpha=1;ctx.shadowBlur=0;
   if(!graph){ctx.restore();return;}
   for(const t of travellers){if(!t.walker)continue;const hz=t.heardPitch??pitch(t,graph.edges[t.walker.edge]);$(`traveller-note-${t.id}`).textContent=`${t.enabled?'':'Off · '}${t.scale==='free'?`${hz.toFixed(1)} Hz`:noteName(hz)} · ${isNoteVoice(t.instrument)?`${t.strikes} ${t.strikes===1?'note':'notes'}`:'resonance'}`;}
   const t=travellers[selected];if(t.walker){const e=graph.edges[t.walker.edge],hz=t.heardPitch??pitch(t,e),note=isNoteVoice(t.instrument);
@@ -281,13 +297,13 @@ function advanceMusic(dt){
   totalTime+=dt;lastThreadMotion=visualNow();musicDirty=true;const s=settings(),form=pieceEnvelope(totalTime,s.duration);
   if(form.finished){finished=true;stop();message();return;}
   audio.setVolume(s.volume*form.gain);
-  for(const t of travellers){t.advance(dt,t.speed*s.speed,s.mode,soundEdge);if(t.enabled&&t.walker&&isNoteVoice(t.instrument)){const e=graph.edges[t.walker.edge];audio.colour(curvature(e,t.walker.reverse?e.length-t.walker.distance:t.walker.distance),t.id);}}
+  for(const t of travellers){t.advance(dt,t.speed*s.speed*form.pace,s.mode,(voice,transition)=>{if(graph.nodes[transition.nodeId]?.edges.length>=3)threadLights.emitJunction(graph,voice.id,transition.nodeId,visualNow());soundEdge(voice);});if(t.enabled&&t.walker&&isNoteVoice(t.instrument)){const e=graph.edges[t.walker.edge];audio.colour(curvature(e,t.walker.reverse?e.length-t.walker.distance:t.walker.distance),t.id);}}
   if(form.acceptNotes)answer();else conversation.pending.clear();
   if(!active().length)stop();
 }
 function frame(){
-  if(!document.hidden&&(playing||musicDirty||(visualMode!=='trace'&&(threadLights.live(visualNow()).length||visualNow()<lastThreadMotion+4)))){draw();musicDirty=false;}
-  const s=settings(),form=pieceEnvelope(totalTime,s.duration),status=finished?'Finished.':playing&&!form.acceptNotes?'Last notes…':'';
+  if(!document.hidden&&(playing||musicDirty||threadLights.live(visualNow()).length||visualNow()<lastThreadMotion+4)){draw();musicDirty=false;}
+  const s=settings(),form=pieceEnvelope(totalTime,s.duration),status=finished?'Finished.':playing&&!form.acceptNotes?'Last notes…':playing?'':pathFeedback;
   if($('performance-status').textContent!==status)$('performance-status').textContent=status;
   $('performance-status').hidden=!status;
   $('elapsed').textContent=`${String(Math.floor(totalTime/60)).padStart(2,'0')}:${String(Math.floor(totalTime%60)).padStart(2,'0')}`;
@@ -349,6 +365,7 @@ function updateLabels(){
 }
 for(const [id,unit] of [['speed','%'],['tuning',' Hz'],['volume','%'],['sensitivity',''],['response-gap',' s'],['room','%'],['delay-time',' ms'],['delay-mix','%'],['delay-feedback','%']])$(id).oninput=()=>{
   $(`${id}-value`).textContent=$(id).value+unit;const s=settings();updateLabels();updateEffects();if(playing)audio.setVolume(s.volume);
+  if(id==='sensitivity'){$('suggest-sensitivity').hidden=true;pathFeedback='Sensitivity changed · rebuild paths';}
   if(id==='tuning'&&graph){for(const t of active())if(!isNoteVoice(t.instrument)){const hz=pitch(t,graph.edges[t.walker.edge]);audio.tune(hz,t.ring,t.id);t.heardPitch=playing?hz:null;}draw();}
 };
 $('delay-enabled').onchange=()=>{updateLabels();updateEffects();};
@@ -372,6 +389,7 @@ document.querySelectorAll('.control-group').forEach(group=>group.addEventListene
 document.addEventListener('input',event=>{if(event.target.id!=='preset'&&event.target.matches('input[type=range],select'))customMood();});
 document.addEventListener('change',event=>{if(event.target.id!=='preset'&&event.target.matches('select,#delay-enabled'))customMood();});
 $('analyse').onclick=analyse;
+$('suggest-sensitivity').onclick=()=>{const value=Number($('suggest-sensitivity').dataset.value);if(!Number.isFinite(value))return;$('sensitivity').value=String(value);$('sensitivity-value').textContent=String(value);paintRange($('sensitivity'));analyse();};
 const drawingSettings=$('drawing-settings');
 document.addEventListener('click',event=>{if(drawingSettings.open&&!drawingSettings.contains(event.target))drawingSettings.open=false;});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&drawingSettings.open){drawingSettings.open=false;drawingSettings.querySelector('summary').focus();}});

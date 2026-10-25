@@ -29,6 +29,10 @@ export class ThreadLights {
     }
     this.live(now);this.pulses.push({voice,time:now,position:pointOnEdge(source,offset),segments});if(this.pulses.length>16)this.pulses.shift();
   }
+  emitJunction(graph,voice,nodeId,now){
+    const node=graph.nodes[nodeId],edgeId=node?.edges[0];if(!node||edgeId===undefined)return;
+    this.emit(graph,voice,edgeId,nodeId,0,now);const pulse=this.pulses.at(-1);pulse.kind='junction';pulse.position={x:node.x,y:node.y};
+  }
 }
 
 function halo(ctx,p,radius,colour,alpha){

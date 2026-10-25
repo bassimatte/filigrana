@@ -83,7 +83,7 @@ function drawDewNodes(ctx,{graph,scale,now,colour,reducedMotion}){
 
 export function drawAmbient(ctx,{mode,graph,path,travellers,scale,now,pulses,lastMotion,playing,hover,drag,palette,dark,reducedMotion}){
   if(!graph)return;
-  base(ctx,path,scale,palette.green,mode==='dew'?(dark?.12:.24):(dark?.09:.18));
+  base(ctx,path,scale,palette.green,mode==='dew'?(dark?.25:.3):(dark?.2:.26));
   if(mode==='afterimage')drawAfterimage(ctx,{travellers,scale,lastMotion,now,playing,drag});
   else if(mode==='halos')drawHalos(ctx,{travellers,pulses,scale,now,reducedMotion});
   else if(mode==='waves')drawWaves(ctx,{travellers,pulses,scale,now,reducedMotion});

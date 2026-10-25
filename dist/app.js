@@ -1,5 +1,5 @@
-import {ThreadLights,drawThreads} from './luminous-threads.js?v=17';
-import {drawAmbient} from './ambient-views.js?v=2';
+import {ThreadLights,drawThreads} from './luminous-threads.js?v=18';
+import {drawAmbient} from './ambient-views.js?v=3';
 import {DrawingView} from './drawing-view.js?v=12';
 import {PlaybackClock} from './playback-clock.js?v=9';
 import {MixRecorder,canRecord} from './recorder.js?v=7';
@@ -252,8 +252,8 @@ function draw(){
     drawThreads(ctx,{graph,path:pathVector,travellers,scale:view.scale,now:visualNow(),pulses:threadLights.live(visualNow()),lastMotion:lastThreadMotion,playing,hover:hoverVoice,drag,palette,dark:document.documentElement.dataset.theme==='dark',reducedMotion:window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches});
   }else if(visualMode==='trace'){
     ctx.globalAlpha=.58;ctx.drawImage(image,0,0,drawingWidth,drawingHeight);ctx.globalAlpha=1;
-    if(pathVector){ctx.globalAlpha=document.documentElement.dataset.theme==='dark'?.23:.42;ctx.strokeStyle=palette.green;ctx.lineWidth=1.1;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke(pathVector);ctx.globalAlpha=1;}
-    if(graph){ctx.fillStyle=palette.green;ctx.globalAlpha=document.documentElement.dataset.theme==='dark'?.28:.44;for(const n of graph.junctions){ctx.beginPath();ctx.arc(n.x,n.y,1.8,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;}
+    if(pathVector){ctx.globalAlpha=document.documentElement.dataset.theme==='dark'?.4:.52;ctx.strokeStyle=palette.green;ctx.lineWidth=1.25;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke(pathVector);ctx.globalAlpha=1;}
+    if(graph){ctx.fillStyle=palette.green;ctx.globalAlpha=document.documentElement.dataset.theme==='dark'?.44:.55;for(const n of graph.junctions){ctx.beginPath();ctx.arc(n.x,n.y,2,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;}
     if(!graph){ctx.restore();return;}
     for(const t of travellers){
       if(!t.walker){$(`traveller-note-${t.id}`).textContent='No path';continue;}

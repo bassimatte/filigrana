@@ -14,7 +14,7 @@ import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v
 const icon=name=>`<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-${name}"/></svg>`;
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
-let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,visualMode='threads',totalTime=0,loadId=0,pathVector=null,finished=false,lastSpeaker=null,pathFeedback='';
+let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,visualMode='threads',totalTime=0,loadId=0,pathVector=null,previewGraph=null,previewPath=null,previewTimer=null,previewId=0,finished=false,lastSpeaker=null,pathFeedback='';
 const view=new DrawingView(),threadLights=new ThreadLights();
 const STARTER_IMAGES=[
   {name:'RP-F-2002-21-4-24.webp',sensitivity:70},
@@ -76,8 +76,19 @@ let palette={paper:'#f4f1e9',green:'#527153'};
 const photoColours=['#a94c2c','#276b86','#79518d'];
 function paintPaths(){
   pathVector=null;if(!graph)return;
-  pathVector=new Path2D();
-  for(const e of graph.edges)e.points.forEach((p,i)=>i?pathVector.lineTo(p.x,p.y):pathVector.moveTo(p.x,p.y));
+  pathVector=pathForGraph(graph);
+}
+function pathForGraph(source){const path=new Path2D();for(const e of source.edges)e.points.forEach((p,i)=>i?path.lineTo(p.x,p.y):path.moveTo(p.x,p.y));return path;}
+function extractGraph(sensitivity){
+  const source=document.createElement('canvas');source.width=drawingWidth;source.height=drawingHeight;const sourceContext=source.getContext('2d',{willReadFrequently:true});
+  sourceContext.drawImage(image,0,0,drawingWidth,drawingHeight);
+  const mask=thin(inkMask(sourceContext.getImageData(0,0,drawingWidth,drawingHeight).data,drawingWidth,drawingHeight,sensitivity),drawingWidth,drawingHeight);
+  return graphFromSkeleton(mask,drawingWidth,drawingHeight);
+}
+function clearPathPreview(){clearTimeout(previewTimer);previewTimer=null;previewId++;previewGraph=null;previewPath=null;$('analyse').textContent='Rebuild paths';}
+function previewSensitivity(value){
+  clearTimeout(previewTimer);const id=++previewId;previewGraph=null;previewPath=null;$('analyse').textContent='Preparing preview…';pathFeedback=`Preparing path preview · sensitivity ${value}`;draw();
+  previewTimer=setTimeout(()=>{if(id!==previewId||!image)return;try{previewGraph=extractGraph(value);previewPath=pathForGraph(previewGraph);pathFeedback=previewGraph.edges.length?`Path preview · ${previewGraph.edges.length} paths · Rebuild to apply`:`Path preview · no paths found · Rebuild to apply`;$('analyse').textContent='Apply path preview';}catch(error){previewGraph=null;previewPath=null;pathFeedback=`Preview failed · ${error.message}`;$('analyse').textContent='Rebuild paths';}draw();},220);
 }
 function refreshPalette(){
   const styles=getComputedStyle(document.documentElement),value=key=>styles.getPropertyValue(key).trim();
@@ -200,7 +211,7 @@ $('global-scale').onchange=()=>{
   syncScaleControl();customMood();draw();message();
 };
 async function loadImage(src,name,sensitivity=null){
-  const id=++loadId;stop();pathFeedback='';$('suggest-sensitivity').hidden=true;busy=true;uiState();message('Reading the image…');
+  const id=++loadId;stop();clearPathPreview();pathFeedback='';$('suggest-sensitivity').hidden=true;busy=true;uiState();message('Reading the image…');
   try{
     if(Number.isFinite(sensitivity)){$('sensitivity').value=sensitivity;$('sensitivity-value').textContent=String(sensitivity);paintRange($('sensitivity'));}
     const img=new Image();img.src=src;await img.decode();if(id!==loadId)return;image=img;
@@ -213,13 +224,10 @@ function loadStarterImage(){
   loadImage(new URL(`./images/${encodeURIComponent(starter.name)}`,import.meta.url).href,starter.name,starter.sensitivity);
 }
 async function analyse(){
-  if(!image)return;stop();threadLights.clear();pathFeedback='';$('suggest-sensitivity').hidden=true;busy=true;uiState();message('Finding ink, thinning lines, and measuring the paths…');
+  if(!image)return;clearPathPreview();stop();threadLights.clear();pathFeedback='';$('suggest-sensitivity').hidden=true;busy=true;uiState();message('Finding ink, thinning lines, and measuring the paths…');
   await new Promise(r=>setTimeout(r,35));
   try{
-    const source=document.createElement('canvas');source.width=drawingWidth;source.height=drawingHeight;const sourceContext=source.getContext('2d',{willReadFrequently:true});
-    sourceContext.drawImage(image,0,0,drawingWidth,drawingHeight);
-    const mask=thin(inkMask(sourceContext.getImageData(0,0,drawingWidth,drawingHeight).data,drawingWidth,drawingHeight,+$('sensitivity').value),drawingWidth,drawingHeight);
-    graph=graphFromSkeleton(mask,drawingWidth,drawingHeight);totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.setGraph(graph);}
+    graph=extractGraph(+$('sensitivity').value);totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.setGraph(graph);}
     paintPaths();
     $('junction-count').textContent=`${graph.junctions.length} junctions`;
     if(graph.edges.length){
@@ -257,7 +265,13 @@ function draw(){
   ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.shadowBlur=0;ctx.clearRect(0,0,canvas.width,canvas.height);
   if(visualMode!=='threads'){ctx.fillStyle=palette.paper;ctx.fillRect(0,0,canvas.width,canvas.height);}
   ctx.save();ctx.setTransform(ratio*view.scale,0,0,ratio*view.scale,ratio*view.x,ratio*view.y);
-  if(visualMode==='threads'){
+  if(previewGraph){
+    ctx.drawImage(image,0,0,drawingWidth,drawingHeight);
+    if(pathVector){ctx.globalAlpha=.34;ctx.strokeStyle=palette.green;ctx.lineWidth=1.1;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke(pathVector);}
+    if(previewPath){ctx.globalAlpha=.94;ctx.strokeStyle=document.documentElement.dataset.theme==='dark'?'#a6e6c4':'#087c68';ctx.lineWidth=2.5;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke(previewPath);}
+    ctx.globalAlpha=1;
+    ctx.fillStyle=document.documentElement.dataset.theme==='dark'?'#a6e6c4':'#087c68';for(const n of previewGraph.junctions){ctx.beginPath();ctx.arc(n.x,n.y,2.5,0,Math.PI*2);ctx.fill();}
+  }else if(visualMode==='threads'){
     drawThreads(ctx,{graph,path:pathVector,travellers,scale:view.scale,now:visualNow(),pulses:threadLights.live(visualNow()),lastMotion:lastThreadMotion,playing,hover:hoverVoice,drag,palette,dark:document.documentElement.dataset.theme==='dark',reducedMotion:window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches});
   }else if(visualMode==='trace'){
     ctx.globalAlpha=.58;ctx.drawImage(image,0,0,drawingWidth,drawingHeight);ctx.globalAlpha=1;
@@ -303,7 +317,7 @@ function advanceMusic(dt){
 }
 function frame(){
   if(!document.hidden&&(playing||musicDirty||threadLights.live(visualNow()).length||visualNow()<lastThreadMotion+4)){draw();musicDirty=false;}
-  const s=settings(),form=pieceEnvelope(totalTime,s.duration),status=finished?'Finished.':playing&&!form.acceptNotes?'Last notes…':playing?'':pathFeedback;
+  const s=settings(),form=pieceEnvelope(totalTime,s.duration),status=finished?'Finished.':playing&&!form.acceptNotes?'Last notes…':playing&&!(previewGraph||previewTimer)?'':pathFeedback;
   if($('performance-status').textContent!==status)$('performance-status').textContent=status;
   $('performance-status').hidden=!status;
   $('elapsed').textContent=`${String(Math.floor(totalTime/60)).padStart(2,'0')}:${String(Math.floor(totalTime%60)).padStart(2,'0')}`;
@@ -365,7 +379,7 @@ function updateLabels(){
 }
 for(const [id,unit] of [['speed','%'],['tuning',' Hz'],['volume','%'],['sensitivity',''],['response-gap',' s'],['room','%'],['delay-time',' ms'],['delay-mix','%'],['delay-feedback','%']])$(id).oninput=()=>{
   $(`${id}-value`).textContent=$(id).value+unit;const s=settings();updateLabels();updateEffects();if(playing)audio.setVolume(s.volume);
-  if(id==='sensitivity'){$('suggest-sensitivity').hidden=true;pathFeedback='Sensitivity changed · rebuild paths';}
+  if(id==='sensitivity'){$('suggest-sensitivity').hidden=true;previewSensitivity(+$('sensitivity').value);}
   if(id==='tuning'&&graph){for(const t of active())if(!isNoteVoice(t.instrument)){const hz=pitch(t,graph.edges[t.walker.edge]);audio.tune(hz,t.ring,t.id);t.heardPitch=playing?hz:null;}draw();}
 };
 $('delay-enabled').onchange=()=>{updateLabels();updateEffects();};

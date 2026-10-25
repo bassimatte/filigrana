@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.js",
-    "dev": "python3 -m http.server 8437 --directory dist --bind 127.0.0.1"
+    "dev": "npm run prepare:images && python3 -m http.server 8437 --directory dist --bind 127.0.0.1",
+    "prepare:images": "cp -R images dist/"
   }
 }

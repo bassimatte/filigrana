@@ -18,6 +18,7 @@ jobs:
         with:
           node-version: 22
       - run: npm test
+      - run: npm run prepare:images
       - uses: actions/configure-pages@v5
         if: github.event_name != 'pull_request'
       - uses: actions/upload-pages-artifact@v4

@@ -17,13 +17,15 @@ const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Travelle
 let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,visualMode='threads',totalTime=0,loadId=0,pathVector=null,previewGraph=null,previewPath=null,previewTimer=null,previewId=0,finished=false,lastSpeaker=null,pathFeedback='';
 const view=new DrawingView(),threadLights=new ThreadLights();
 const STARTER_IMAGES=[
-  {name:'RP-F-2002-21-4-24.webp',sensitivity:70},
-  {name:'aloe_spirale.jpg',sensitivity:80},
-  {name:'adiantum_pedatum_2006.133.34.55.jpg',sensitivity:70},
-  {name:'IMG_1790 2.JPG',sensitivity:55},
-  {name:'IMG_1791 2.JPG',sensitivity:55},
-  {name:'cacdoha_000082_access.webp',sensitivity:80},
-  {name:'jazz sax.jpeg',sensitivity:80}
+  {name:'adiantum pedatum.jpg',sensitivity:70},
+  {name:'aloe.jpg',sensitivity:80},
+  {name:'bike.png',sensitivity:70},
+  {name:'blue-violet figure golaleh.png',sensitivity:70},
+  {name:'butterfly golaleh.png',sensitivity:70},
+  {name:'cacdoha.webp',sensitivity:80},
+  {name:'jazz sax.jpeg',sensitivity:80},
+  {name:'leaves and flower arches.webp',sensitivity:80},
+  {name:'ornamental golaleh.png',sensitivity:70}
 ];
 const visualNow=()=>performance.now()/1000;
 let lastThreadMotion=0,hoverVoice=null;

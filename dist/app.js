@@ -3,7 +3,7 @@ import {drawAmbient} from './ambient-views.js?v=1';
 import {DrawingView} from './drawing-view.js?v=12';
 import {PlaybackClock} from './playback-clock.js?v=9';
 import {MixRecorder,canRecord} from './recorder.js?v=7';
-import {PRESETS,matchingPreset} from './presets.js?v=6';
+import {PRESETS,matchingPreset} from './presets.js?v=7';
 import {inkMask,thin,graphFromSkeleton,resonance,chooseEdge,pointOnEdge} from './geometry.js';
 import {Resonator} from './audio.js?v=7';
 import {bellPitch,bellDecay,curvature,noteName,tunePitch,SCALES} from './music.js';
@@ -342,7 +342,7 @@ $('interaction').onchange=()=>{audio.silence();conversation.reset();lastSpeaker=
 $('seed').onchange=()=>{const value=Number($('seed').value);$('seed').value=String(Number.isFinite(value)?Math.max(0,Math.min(2147483647,Math.round(value))):1);message('The new journey seed will apply when you press Restart.');};
 function applyPreset(key){
   const mood=PRESETS[key];audio.silence();conversation.reset();lastSpeaker=null;
-  for(const t of travellers){t.instrument=mood.keys[t.id];t.octave=mood.octaves[t.id];t.speed=mood.speeds[t.id];t.spacing=mood.spacing[t.id];t.volume=mood.volumes[t.id];t.ring=mood.ring;t.pan=(t.id-1)*.4;t.scale='pentatonic';t.phrasing.reset();t.heardPitch=null;syncTraveller(t);audio.setTraveller(t.id,t.volume,t.pan);}
+  for(const t of travellers){t.instrument=mood.keys[t.id];t.octave=mood.octaves[t.id];t.speed=mood.speeds[t.id];t.spacing=mood.spacing[t.id];t.volume=mood.volumes[t.id];t.ring=mood.ring;t.pan=(t.id-1)*.4;t.scale=mood.scale||'pentatonic';t.phrasing.reset();t.heardPitch=null;syncTraveller(t);audio.setTraveller(t.id,t.volume,t.pan);}
   for(const [id,value,unit]of [['room',mood.room,'%'],['speed',mood.pace,'%'],['response-gap',mood.gap,' s']]){$(id).value=value;$(`${id}-value`).textContent=value+unit;}
   $('preset').value=key;
   updateEffects();updateLabels();voiceOverview();

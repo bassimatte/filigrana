@@ -99,7 +99,7 @@ Each voice now offers 14 instruments, including glass harmonica, handpan, bass c
 | Dusk | Bass clarinet · glass harmonica · bowl |
 | Crystal room | Glass harmonica · vibraphone · felt bell |
 
-Presets set instruments, octaves, individual expression, pace, space, decay, and response gap. They preserve starting points, enabled/muted voices, interaction, branching, journey seed, root, overall output, duration, and delay. The dropdown shows Custom for edited arrangements and recognizes matching presets when compositions are loaded. Existing composition files remain compatible.
+Moonwater and Woodland use minor pentatonic; Dusk uses natural minor. Flowing and Lanterns use closer note spacing for more frequent, gently moving phrases, while the other presets retain more open spacing. Presets set instruments, octaves, scale, individual expression, pace, space, decay, and response gap. They preserve starting points, enabled/muted voices, interaction, branching, journey seed, root, overall output, duration, and delay. The dropdown shows Custom for edited arrangements and recognizes matching presets when compositions are loaded. Existing composition files remain compatible.
 
 ## Recording settings
 

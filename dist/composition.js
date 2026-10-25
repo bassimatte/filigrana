@@ -1,8 +1,8 @@
-import {INSTRUMENTS} from './instruments.js?v=6';
+import {INSTRUMENTS} from './instruments.js?v=7';
 import {SCALES} from './music.js';
 const number=(v,min,max,fallback)=>Number.isFinite(v)?Math.max(min,Math.min(max,v)):fallback;
 export function numericSeed(value){const text=String(value??'1');if(/^\d+$/.test(text))return Math.min(2147483647,Number(text));let hash=2166136261;for(const c of text){hash^=c.charCodeAt(0);hash=Math.imul(hash,16777619);}return(hash>>>0)%2147483648;}
-export const CONTROL_LIMITS={speed:[25,200,100],tuning:[55,660,196],q:[3,65,42],volume:[0,100,35],sensitivity:[10,95,55],room:[0,70,32],'delay-time':[100,1800,650],'delay-feedback':[0,65,28],'delay-mix':[0,50,18],'response-gap':[.8,6,2.4]};
+export const CONTROL_LIMITS={speed:[25,200,100],tuning:[55,660,196],q:[3,65,42],volume:[0,100,35],sensitivity:[10,95,55],room:[0,70,32],'delay-time':[100,1800,650],'delay-feedback':[0,90,28],'delay-mix':[0,50,18],'response-gap':[.8,6,2.4]};
 export function validateComposition(input){
   if(!input||input.format!=='line-resonator'||input.version!==1)throw new Error('Choose a Filigrana composition file.');
   if(typeof input.image?.src!=='string'||!/^data:image\/(jpeg|png|webp);base64,[a-zA-Z0-9+/=]+$/.test(input.image.src)||input.image.src.length>35e6)throw new Error('The composition needs an embedded JPEG, PNG, or WebP image.');

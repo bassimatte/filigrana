@@ -38,7 +38,7 @@ function halo(ctx,p,radius,colour,alpha){
 
 export function drawThreads(ctx,{graph,path,travellers,scale,now,pulses,lastMotion,playing,hover,drag,palette,dark,reducedMotion}){
   if(!graph)return;
-  ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=palette.green;ctx.lineWidth=.75/scale;ctx.globalAlpha=dark?.19:.16;if(path)ctx.stroke(path);
+  ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=palette.green;ctx.lineWidth=(dark?.75:.95)/scale;ctx.globalAlpha=dark?.19:.3;if(path)ctx.stroke(path);
   for(const pulse of pulses){
     const t=travellers[pulse.voice];if(!t.enabled)continue;
     const age=now-pulse.time,colour=t.colour,fade=Math.exp(-age*.65);

@@ -20,5 +20,5 @@ export const instrument=key=>Object.hasOwn(INSTRUMENTS,key)?INSTRUMENTS[key]:INS
 export const isNoteVoice=key=>!instrument(key).continuous;
 export function delaySettings(time,mix,feedback,enabled=true){
   const finite=(v,fallback)=>Number.isFinite(v)?v:fallback;
-  return {time:Math.max(.08,Math.min(2,finite(time,.65))),mix:enabled?Math.max(0,Math.min(.5,finite(mix,0))):0,feedback:enabled?Math.max(0,Math.min(.65,finite(feedback,0))):0,send:enabled?1:0};
+  return {time:Math.max(.08,Math.min(2,finite(time,.65))),mix:enabled?Math.max(0,Math.min(.5,finite(mix,0))):0,feedback:enabled?Math.max(0,Math.min(.9,finite(feedback,0))):0,send:enabled?1:0};
 }

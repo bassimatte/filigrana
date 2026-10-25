@@ -81,9 +81,9 @@ function drawDewNodes(ctx,{graph,scale,now,colour,reducedMotion}){
   for(const node of graph.junctions){const pulse=reducedMotion ? .82 : .65+.35*Math.sin(now*1.5+node.id);ctx.globalAlpha=.2*pulse;ctx.fillStyle=colour;ctx.beginPath();ctx.arc(node.x,node.y,2/scale,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;}
 }
 
-export function drawAmbient(ctx,{mode,graph,path,travellers,scale,now,pulses,lastMotion,playing,hover,drag,palette,reducedMotion}){
+export function drawAmbient(ctx,{mode,graph,path,travellers,scale,now,pulses,lastMotion,playing,hover,drag,palette,dark,reducedMotion}){
   if(!graph)return;
-  base(ctx,path,scale,palette.green,mode==='dew'?.12:.09);
+  base(ctx,path,scale,palette.green,mode==='dew'?(dark?.12:.24):(dark?.09:.18));
   if(mode==='afterimage')drawAfterimage(ctx,{travellers,scale,lastMotion,now,playing,drag});
   else if(mode==='halos')drawHalos(ctx,{travellers,pulses,scale,now,reducedMotion});
   else if(mode==='waves')drawWaves(ctx,{travellers,pulses,scale,now,reducedMotion});

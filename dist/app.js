@@ -1,5 +1,5 @@
-import {ThreadLights,drawThreads} from './luminous-threads.js?v=16';
-import {drawAmbient} from './ambient-views.js?v=1';
+import {ThreadLights,drawThreads} from './luminous-threads.js?v=17';
+import {drawAmbient} from './ambient-views.js?v=2';
 import {DrawingView} from './drawing-view.js?v=12';
 import {PlaybackClock} from './playback-clock.js?v=9';
 import {MixRecorder,canRecord} from './recorder.js?v=7';
@@ -8,13 +8,13 @@ import {inkMask,thin,graphFromSkeleton,resonance,chooseEdge,pointOnEdge} from '.
 import {Resonator} from './audio.js?v=7';
 import {bellPitch,bellDecay,curvature,noteName,tunePitch,SCALES} from './music.js';
 import {Traveller,defaultStarts} from './traveller.js?v=2';
-import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=6';
+import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=7';
 import {Conversation,pieceEnvelope} from './performance.js';
-import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=9';
+import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=10';
 const icon=name=>`<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-${name}"/></svg>`;
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
-let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,visualMode='threads',totalTime=0,loadId=0,pathVector=null,downloadURL=null,finished=false,lastSpeaker=null;
+let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,visualMode='threads',totalTime=0,loadId=0,pathVector=null,finished=false,lastSpeaker=null;
 const view=new DrawingView(),threadLights=new ThreadLights();
 const STARTER_IMAGES=[
   {name:'RP-F-2002-21-4-24.webp',sensitivity:70},
@@ -252,8 +252,8 @@ function draw(){
     drawThreads(ctx,{graph,path:pathVector,travellers,scale:view.scale,now:visualNow(),pulses:threadLights.live(visualNow()),lastMotion:lastThreadMotion,playing,hover:hoverVoice,drag,palette,dark:document.documentElement.dataset.theme==='dark',reducedMotion:window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches});
   }else if(visualMode==='trace'){
     ctx.globalAlpha=.58;ctx.drawImage(image,0,0,drawingWidth,drawingHeight);ctx.globalAlpha=1;
-    if(pathVector){ctx.globalAlpha=.23;ctx.strokeStyle=palette.green;ctx.lineWidth=1.1;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke(pathVector);ctx.globalAlpha=1;}
-    if(graph){ctx.fillStyle=palette.green;ctx.globalAlpha=.28;for(const n of graph.junctions){ctx.beginPath();ctx.arc(n.x,n.y,1.8,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;}
+    if(pathVector){ctx.globalAlpha=document.documentElement.dataset.theme==='dark'?.23:.42;ctx.strokeStyle=palette.green;ctx.lineWidth=1.1;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke(pathVector);ctx.globalAlpha=1;}
+    if(graph){ctx.fillStyle=palette.green;ctx.globalAlpha=document.documentElement.dataset.theme==='dark'?.28:.44;for(const n of graph.junctions){ctx.beginPath();ctx.arc(n.x,n.y,1.8,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;}
     if(!graph){ctx.restore();return;}
     for(const t of travellers){
       if(!t.walker){$(`traveller-note-${t.id}`).textContent='No path';continue;}
@@ -265,7 +265,7 @@ function draw(){
       ctx.font='bold 8px sans-serif';ctx.textAlign='center';ctx.fillStyle=colour;ctx.fillText(String(t.id+1),p.x,p.y-12);ctx.globalAlpha=1;
     }
   }else{
-    drawAmbient(ctx,{mode:visualMode,graph,path:pathVector,travellers,scale:view.scale,now:visualNow(),pulses:threadLights.live(visualNow()),lastMotion:lastThreadMotion,playing,hover:hoverVoice,drag,palette,reducedMotion:window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches});
+    drawAmbient(ctx,{mode:visualMode,graph,path:pathVector,travellers,scale:view.scale,now:visualNow(),pulses:threadLights.live(visualNow()),lastMotion:lastThreadMotion,playing,hover:hoverVoice,drag,palette,dark:document.documentElement.dataset.theme==='dark',reducedMotion:window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches});
   }
   if(!graph){ctx.restore();return;}
   for(const t of travellers){if(!t.walker)continue;const hz=t.heardPitch??pitch(t,graph.edges[t.walker.edge]);$(`traveller-note-${t.id}`).textContent=`${t.enabled?'':'Off · '}${t.scale==='free'?`${hz.toFixed(1)} Hz`:noteName(hz)} · ${isNoteVoice(t.instrument)?`${t.strikes} ${t.strikes===1?'note':'notes'}`:'resonance'}`;}
@@ -381,18 +381,21 @@ async function asDataURL(blob){
 }
 document.querySelector('label[for=upload]').onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();$('upload').click();}};
 $('upload').onchange=async event=>{const file=event.target.files[0];if(!file)return;await loadImage(await asDataURL(file),file.name,55);event.target.value='';};
-function download(blob,name){if(downloadURL)URL.revokeObjectURL(downloadURL);downloadURL=URL.createObjectURL(blob);const a=document.createElement('a');a.href=downloadURL;a.download=name;a.click();}
+function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
 $('save-score').onclick=async()=>{
   if(!image||!graph?.edges.length||busy)return;$('save-score').disabled=true;
   try{
-    const src=image.src.startsWith('data:')?image.src:await asDataURL(await (await fetch(image.src)).blob()),controls={};
+    const drawingBlob=await (await fetch(image.src)).blob(),src=image.src.startsWith('data:')?image.src:await asDataURL(drawingBlob),controls={};
     for(const key of Object.keys(CONTROL_LIMITS))if(key!=='q')controls[key]=+$(key).value;
     Object.assign(controls,{branch:$('branch').value,interaction:$('interaction').value,duration:+$('duration').value,seed:$('seed').value,'delay-enabled':$('delay-enabled').checked});
     const score={format:'line-resonator',version:1,image:{src,name:$('image-name').textContent},controls,graph:{w:graph.w,h:graph.h,edges:graph.edges.length},travellers:travellers.map(t=>{
       const {instrument,scale,enabled,octave,speed,spacing,volume,ring,pan}=t,e=graph.edges[t.origin.edgeId],reverse=e.b===t.origin.from&&e.a!==t.origin.from,p=pointOnEdge(e,reverse?e.length-t.origin.distance:t.origin.distance);
       return {instrument,scale,enabled,octave,speed,spacing,volume,ring,pan,origin:{...t.origin,x:p.x/graph.w,y:p.y/graph.h}};
     })};
-    validateComposition(score);download(new Blob([JSON.stringify(score)],{type:'application/json'}),'filigrana.line-score.json');message('Composition saved.');
+    validateComposition(score);download(new Blob([JSON.stringify(score)],{type:'application/json'}),'filigrana.line-score.json');
+    let drawingName=$('image-name').textContent.split(/[\\/]/).pop().replace(/[<>:"|?*]/g,'-')||'filigrana-drawing';
+    if(!/\.[a-z0-9]{2,5}$/i.test(drawingName))drawingName+=drawingBlob.type==='image/png'?'.png':drawingBlob.type==='image/webp'?'.webp':'.jpg';
+    download(drawingBlob,drawingName);message('Composition and image saved.');
   }catch(error){message(`Could not save the composition: ${error.message}`);}finally{uiState();}
 };
 $('load-score').onchange=async event=>{

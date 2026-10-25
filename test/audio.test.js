@@ -34,6 +34,6 @@ test('all note instruments create playable, releasable voices, including breath 
 test('delay feedback is bounded and bypass stops the send as well as the wet return',()=>{
   assert.deepEqual(delaySettings(.65,.18,.28),{time:.65,mix:.18,feedback:.28,send:1});
   assert.deepEqual(delaySettings(.65,.18,.28,false),{time:.65,mix:0,feedback:0,send:0});
-  const s=delaySettings(100,100,100);assert.ok(s.time<=2&&s.mix<=.5&&s.feedback<=.65);
+  const s=delaySettings(100,100,100);assert.ok(s.time<=2&&s.mix<=.5&&s.feedback<=.9);
   const invalid=delaySettings(NaN,NaN,NaN);assert.ok(Object.values(invalid).every(Number.isFinite));
 });

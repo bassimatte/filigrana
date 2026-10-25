@@ -1,4 +1,4 @@
-import {delaySettings} from './instruments.js?v=6';
+import {delaySettings} from './instruments.js?v=7';
 import {notePlan,toneCutoff,limiterCurve,roomImpulse} from './synthesis.js?v=6';
 export class Resonator {
   async init(context=null) {

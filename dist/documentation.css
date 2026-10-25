@@ -1,0 +1,36 @@
+.documentation-page { padding-bottom: 0; }
+.documentation-header { height: 78px; }
+.doc-back { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+.doc-back:hover, .doc-return:hover { color: var(--ink); }
+.documentation-main { display: block; width: min(100% - 48px, 760px); max-width: none; padding: 76px 0 90px; margin: 0 auto; }
+.documentation-main>.eyebrow { margin-bottom: 20px; }
+.documentation-main h1 { font: 400 clamp(52px,9vw,88px)/.92 'Instrument Serif',Georgia,serif; letter-spacing: -1.8px; }
+.documentation-main h1 em { color: var(--green); }
+.documentation-lead { max-width: 590px; margin: 27px 0 0; color: var(--muted); font: 18px/1.75 'Instrument Serif',Georgia,serif; }
+.doc-section { margin-top: 70px; padding-top: 28px; border-top: 1px solid var(--line); }
+.doc-index { margin: 0 0 13px; color: var(--green); font-size: 10px; font-weight: 600; letter-spacing: 1.6px; }
+.doc-section h2 { margin: 0 0 20px; font: 400 30px/1.15 'Instrument Serif',Georgia,serif; }
+.doc-section>p:not(.doc-index), .doc-steps p { max-width: 660px; color: var(--muted); font-size: 14px; line-height: 1.85; }
+.doc-steps { display: grid; gap: 22px; margin: 30px 0 0; padding: 0; list-style: none; }
+.doc-steps li { display: grid; grid-template-columns: 34px 1fr; gap: 16px; align-items: start; }
+.step-number { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--green); font: 15px 'Instrument Serif',Georgia,serif; }
+.doc-steps h3 { margin: 1px 0 5px; font: 500 14px/1.5 'DM Sans',sans-serif; }
+.doc-steps p { margin: 0; }
+.doc-controls { margin: 25px 0 0; }
+.doc-controls>div { display: grid; grid-template-columns: 150px 1fr; gap: 24px; padding: 15px 0; border-top: 1px solid color-mix(in srgb,var(--line) 65%,transparent); }
+.doc-controls dt { font-size: 13px; }
+.doc-controls dd { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.doc-note { padding-bottom: 30px; }
+.doc-return { display: inline-flex; gap: 12px; align-items: center; margin-top: 38px; color: var(--green); font-size: 13px; }
+.documentation-page footer { padding-left: max(24px,calc((100vw - 760px)/2)); padding-right: max(24px,calc((100vw - 760px)/2)); }
+@media(max-width:600px) {
+  .documentation-header { height: 68px; }
+  .doc-back { font-size: 10px; }
+  .documentation-main { width: calc(100% - 40px); padding: 58px 0 68px; }
+  .documentation-main h1 { letter-spacing: -1px; }
+  .documentation-lead { font-size: 17px; }
+  .doc-section { margin-top: 54px; }
+  .doc-section h2 { font-size: 27px; }
+  .doc-controls>div { grid-template-columns: 100px 1fr; gap: 16px; }
+  .documentation-page footer { padding-left: 20px; padding-right: 20px; }
+}

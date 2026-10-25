@@ -10,7 +10,7 @@ import {bellPitch,bellDecay,curvature,noteName,tunePitch,SCALES} from './music.j
 import {Traveller,defaultStarts} from './traveller.js?v=3';
 import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=7';
 import {Conversation,pieceEnvelope} from './performance.js?v=2';
-import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=11';
+import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=12';
 const icon=name=>`<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-${name}"/></svg>`;
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
@@ -79,16 +79,16 @@ function paintPaths(){
   pathVector=pathForGraph(graph);
 }
 function pathForGraph(source){const path=new Path2D();for(const e of source.edges)e.points.forEach((p,i)=>i?path.lineTo(p.x,p.y):path.moveTo(p.x,p.y));return path;}
-function extractGraph(sensitivity){
+function extractGraph(sensitivity,cleanup=+$('cleanup').value){
   const source=document.createElement('canvas');source.width=drawingWidth;source.height=drawingHeight;const sourceContext=source.getContext('2d',{willReadFrequently:true});
   sourceContext.drawImage(image,0,0,drawingWidth,drawingHeight);
   const mask=thin(inkMask(sourceContext.getImageData(0,0,drawingWidth,drawingHeight).data,drawingWidth,drawingHeight,sensitivity),drawingWidth,drawingHeight);
-  return graphFromSkeleton(mask,drawingWidth,drawingHeight);
+  return graphFromSkeleton(mask,drawingWidth,drawingHeight,cleanup);
 }
-function clearPathPreview(){clearTimeout(previewTimer);previewTimer=null;previewId++;previewGraph=null;previewPath=null;$('analyse').textContent='Rebuild paths';}
+function clearPathPreview(){clearTimeout(previewTimer);previewTimer=null;previewId++;previewGraph=null;previewPath=null;$('analyse').textContent='Rebuild paths';$('path-preview-legend').hidden=true;}
 function previewSensitivity(value){
-  clearTimeout(previewTimer);const id=++previewId;previewGraph=null;previewPath=null;$('analyse').textContent='Preparing preview…';pathFeedback=`Preparing path preview · sensitivity ${value}`;draw();
-  previewTimer=setTimeout(()=>{if(id!==previewId||!image)return;try{previewGraph=extractGraph(value);previewPath=pathForGraph(previewGraph);pathFeedback=previewGraph.edges.length?`Path preview · ${previewGraph.edges.length} paths · Rebuild to apply`:`Path preview · no paths found · Rebuild to apply`;$('analyse').textContent='Apply path preview';}catch(error){previewGraph=null;previewPath=null;pathFeedback=`Preview failed · ${error.message}`;$('analyse').textContent='Rebuild paths';}draw();},220);
+  clearTimeout(previewTimer);const id=++previewId;previewGraph=null;previewPath=null;$('analyse').textContent='Preparing preview…';pathFeedback=`Preparing preview · sensitivity ${value} · ${$('cleanup').selectedOptions[0].textContent.toLowerCase()} cleanup`;draw();
+  previewTimer=setTimeout(()=>{if(id!==previewId||!image)return;try{previewGraph=extractGraph(value,+$('cleanup').value);previewPath=pathForGraph(previewGraph);pathFeedback=previewGraph.edges.length?`Path preview · ${previewGraph.edges.length} paths · Rebuild to apply`:`Path preview · no paths found · Rebuild to apply`;$('analyse').textContent='Apply path preview';}catch(error){previewGraph=null;previewPath=null;pathFeedback=`Preview failed · ${error.message}`;$('analyse').textContent='Rebuild paths';}draw();},220);
 }
 function refreshPalette(){
   const styles=getComputedStyle(document.documentElement),value=key=>styles.getPropertyValue(key).trim();
@@ -229,7 +229,7 @@ async function analyse(){
   if(!image)return;clearPathPreview();stop();threadLights.clear();pathFeedback='';$('suggest-sensitivity').hidden=true;busy=true;uiState();message('Finding ink, thinning lines, and measuring the paths…');
   await new Promise(r=>setTimeout(r,35));
   try{
-    graph=extractGraph(+$('sensitivity').value);totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.setGraph(graph);}
+    graph=extractGraph(+$('sensitivity').value,+$('cleanup').value);totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.setGraph(graph);}
     paintPaths();
     $('junction-count').textContent=`${graph.junctions.length} junctions`;
     if(graph.edges.length){
@@ -267,6 +267,7 @@ function draw(){
   ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.shadowBlur=0;ctx.clearRect(0,0,canvas.width,canvas.height);
   if(visualMode!=='threads'){ctx.fillStyle=palette.paper;ctx.fillRect(0,0,canvas.width,canvas.height);}
   ctx.save();ctx.setTransform(ratio*view.scale,0,0,ratio*view.scale,ratio*view.x,ratio*view.y);
+  $('path-preview-legend').hidden=!previewGraph;
   if(previewGraph){
     ctx.drawImage(image,0,0,drawingWidth,drawingHeight);
     if(pathVector){ctx.globalAlpha=.34;ctx.strokeStyle=palette.green;ctx.lineWidth=1.1;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke(pathVector);}
@@ -413,6 +414,7 @@ document.addEventListener('input',event=>{if(event.target.id!=='preset'&&event.t
 document.addEventListener('change',event=>{if(event.target.id!=='preset'&&event.target.matches('select,#delay-enabled'))customMood();});
 $('analyse').onclick=analyse;
 $('suggest-sensitivity').onclick=()=>{const value=Number($('suggest-sensitivity').dataset.value);if(!Number.isFinite(value))return;$('sensitivity').value=String(value);$('sensitivity-value').textContent=String(value);paintRange($('sensitivity'));analyse();};
+$('cleanup').onchange=()=>previewSensitivity(+$('sensitivity').value);
 const drawingSettings=$('drawing-settings');
 document.addEventListener('click',event=>{if(drawingSettings.open&&!drawingSettings.contains(event.target))drawingSettings.open=false;});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&drawingSettings.open){drawingSettings.open=false;drawingSettings.querySelector('summary').focus();}});

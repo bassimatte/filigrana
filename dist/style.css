@@ -502,3 +502,11 @@ select, .secondary { font-size: 12px; }
 .transport .transport-status { margin-left: auto; }
 #recording-monitor:not([hidden]) + .transport-status { margin-left: 0; }
 #recording-monitor:not([hidden]) ~ .transport-status #elapsed { display: none; }
+
+.path-preview-legend { position: absolute; z-index: 2; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 7px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 7px; background: var(--overlay); color: var(--ink); font-size: 10px; pointer-events: none; }
+.path-preview-legend[hidden] { display: none; }
+.path-preview-legend span { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.path-preview-legend i { display: inline-block; width: 15px; height: 2px; border-radius: 2px; }
+.current-path-key { background: var(--green); opacity: .48; }
+.candidate-path-key { background: #087c68; }
+[data-theme="dark"] .candidate-path-key { background: #a6e6c4; }

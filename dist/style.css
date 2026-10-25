@@ -227,6 +227,19 @@ footer { justify-content: flex-end; }
 .settings-section + .settings-section { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 18px; }
 .settings-popover input[type="number"] { width: 100%; border: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--ink); padding: 10px 8px; font: inherit; }
 .documentation-link { display: flex; width: 100%; justify-content: center; align-items: center; margin-top: 8px; color: var(--ink); text-decoration: none; }
+.about-instrument { border-top: 1px solid var(--line); padding: 82px 5vw 116px; background: color-mix(in srgb,var(--surface) 42%,transparent); }
+.about-instrument-inner { max-width: 1120px; margin: 0 auto; }
+.about-eyebrow { margin: 0 0 16px; color: var(--green); font-size: 10px; font-weight: 600; letter-spacing: 1.7px; }
+.about-instrument h2 { margin: 0; font: 400 clamp(38px,5vw,56px)/1.05 'Instrument Serif',Georgia,serif; }
+.about-tagline { margin: 14px 0 48px; color: var(--muted); font: italic 28px/1.2 'Instrument Serif',Georgia,serif; }
+.about-columns { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 36px; }
+.about-columns article { border-top: 1px solid var(--line); padding-top: 18px; }
+.about-columns h3 { margin: 0 0 12px; font-size: 13px; font-weight: 500; }
+.about-columns p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.85; }
+.about-links { display: flex; flex-wrap: wrap; gap: 24px; margin-top: 38px; padding-top: 18px; border-top: 1px solid var(--line); }
+.about-links a { color: var(--muted); font-size: 11px; text-underline-offset: 4px; }
+.about-links a:hover { color: var(--ink); text-decoration: underline; }
+@media(max-width:700px) { .about-instrument { padding: 58px 6vw 106px; } .about-tagline { margin-bottom: 34px; font-size: 25px; } .about-columns { grid-template-columns: 1fr; gap: 22px; } .about-columns article { padding-top: 14px; } .about-links { gap: 16px; margin-top: 30px; } }
 .settings-popover { max-height: calc(100vh - 72px); overflow-y: auto; }
 
 .canvas-wrap.luminous { background: transparent; background-image: none; border-color: transparent; }

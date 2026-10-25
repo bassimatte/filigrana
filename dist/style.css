@@ -355,7 +355,9 @@ main { grid-template-columns: minmax(0,1fr) 300px; gap: 32px; align-items: start
 .voices-icon .dot-one { fill: var(--voice-1); }
 .voices-icon .dot-two { fill: var(--voice-2); }
 .voices-icon .dot-three { fill: var(--voice-3); }
-.control-group > summary .summary-label { display: inline-flex; align-items: center; gap: 8px; }
+.control-group > summary .summary-label { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); transition: none; }
+.control-group[open] > summary .summary-label { transform: none; }
+.journey-icon, .fx-icon { color: var(--muted); }
 .listening-panel .controls { border: 0; padding: 24px 0; }
 .listening-panel label:not(.upload), .settings-popover label, .listening-panel .voice-settings .traveller-fields label { font-size: 11px; font-weight: 400; }
 .listening-panel .traveller-heading { font-size: 13px; font-weight: 500; }

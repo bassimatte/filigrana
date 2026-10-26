@@ -10,7 +10,7 @@ import {bellPitch,bellDecay,curvature,noteName,tunePitch,SCALES} from './music.j
 import {Traveller,defaultStarts} from './traveller.js?v=3';
 import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=7';
 import {Conversation,pieceEnvelope} from './performance.js?v=2';
-import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=13';
+import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=14';
 const icon=name=>`<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-${name}"/></svg>`;
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 const audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i));
@@ -223,10 +223,12 @@ async function loadImage(src,name,sensitivity=null){
   const id=++loadId;stop();clearPathPreview();pathFeedback='';$('suggest-sensitivity').hidden=true;busy=true;uiState();message('Reading the image…');
   try{
     if(Number.isFinite(sensitivity)){$('sensitivity').value=sensitivity;$('sensitivity-value').textContent=String(sensitivity);paintRange($('sensitivity'));}
-    const img=new Image();img.src=src;await img.decode();if(id!==loadId)return;image=img;
-    const scale=Math.min(1,960/Math.max(img.width,img.height));drawingWidth=Math.round(img.width*scale);drawingHeight=Math.round(img.height*scale);view.setDrawing(drawingWidth,drawingHeight);updateZoomControls();
+    const img=new Image();img.src=src;await img.decode();if(id!==loadId)return;
+    const scale=Math.min(1,960/Math.max(img.width,img.height));drawingWidth=Math.round(img.width*scale);drawingHeight=Math.round(img.height*scale);
+    if(/\.bmp$/i.test(name)||/^data:image\/(?:x-ms-)?bmp[;,]/i.test(src)){const normalized=document.createElement('canvas');normalized.width=drawingWidth;normalized.height=drawingHeight;normalized.getContext('2d').drawImage(img,0,0,drawingWidth,drawingHeight);img.src=normalized.toDataURL('image/png');await img.decode();}
+    image=img;view.setDrawing(drawingWidth,drawingHeight);updateZoomControls();
     $('image-name').textContent=name;await analyse();
-  }catch(e){busy=false;message(`Could not read this image. Try a JPEG or PNG. ${e.message}`);uiState();}
+  }catch(e){busy=false;message(`Could not read this image. Try a BMP, JPEG, PNG, or WebP. ${e.message}`);uiState();}
 }
 function loadStarterImage(){
   const starter=STARTER_IMAGES[Math.floor(Math.random()*STARTER_IMAGES.length)];
@@ -426,9 +428,9 @@ $('cleanup').onchange=()=>previewSensitivity(+$('sensitivity').value);
 const drawingSettings=$('drawing-settings');
 document.addEventListener('click',event=>{if(drawingSettings.open&&!drawingSettings.contains(event.target))drawingSettings.open=false;});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&drawingSettings.open){drawingSettings.open=false;drawingSettings.querySelector('summary').focus();}});
-async function asDataURL(blob){
+async function asDataURL(blob,name=''){
   const bytes=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=32768)binary+=String.fromCharCode(...bytes.subarray(i,i+32768));
-  return `data:${blob.type||'image/jpeg'};base64,${btoa(binary)}`;
+  const mime=blob.type||(/\.bmp$/i.test(name)?'image/bmp':'image/jpeg');return `data:${mime};base64,${btoa(binary)}`;
 }
 async function compositionSnapshot(){
   const drawingBlob=await(await fetch(image.src)).blob(),src=image.src.startsWith('data:')?image.src:await asDataURL(drawingBlob),controls={};
@@ -442,7 +444,7 @@ async function compositionSnapshot(){
 }
 function drawingFilename(blob){let name=$('image-name').textContent.split(/[\\/]/).pop().replace(/[<>:\"|?*]/g,'-')||'filigrana-drawing';if(!/\.[a-z0-9]{2,5}$/i.test(name))name+=blob.type==='image/png'?'.png':blob.type==='image/webp'?'.webp':'.jpg';return name;}
 document.querySelector('label[for=upload]').onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();$('upload').click();}};
-$('upload').onchange=async event=>{const file=event.target.files[0];if(!file)return;await loadImage(await asDataURL(file),file.name,55);event.target.value='';};
+$('upload').onchange=async event=>{const file=event.target.files[0];if(!file)return;await loadImage(await asDataURL(file,file.name),file.name,55);event.target.value='';};
 function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
 $('save-score').onclick=async()=>{
   if(!image||!graph?.edges.length||busy)return;$('save-score').disabled=true;

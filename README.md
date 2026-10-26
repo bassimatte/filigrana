@@ -60,7 +60,7 @@ Synthesis tests cover envelope ordering, register limits, high-mode removal, bou
 
 `dist/` is the complete static website. GitHub Actions runs the tests and deploys that directory to GitHub Pages on each push to `main`. No API keys, server, or accounts are needed. The original private prototype is separate from this repository.
 
-Open the app to see a randomly selected starter drawing, then press **Listen** or upload your own clear drawing with dark lines on light paper. Your uploaded images, compositions, and recordings are processed locally in your browser; they are not uploaded to a service. The starter drawings are public as part of this repository. Google Fonts may be requested for typography. Audio starts after a user gesture; recording uses the selected MP3 or WAV format.
+Open the app to see a randomly selected starter drawing, then press **Listen** or upload your own clear drawing with dark lines on light paper. BMP, JPEG, PNG, and WebP images are supported. BMP drawings are resized to the instrument's working resolution and converted to PNG for compact composition files. Your uploaded images, compositions, and recordings are processed locally in your browser; they are not uploaded to a service. The starter drawings are public as part of this repository. Google Fonts may be requested for typography. Audio starts after a user gesture; recording uses the selected MP3 or WAV format.
 
 The internal composition identifier remains `line-resonator` so saved prototype compositions remain compatible. New downloads use the Filigrana name.
 

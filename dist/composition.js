@@ -5,7 +5,7 @@ export function numericSeed(value){const text=String(value??'1');if(/^\d+$/.test
 export const CONTROL_LIMITS={speed:[25,200,100],tuning:[55,660,196],q:[3,65,42],volume:[0,100,80],sensitivity:[10,95,55],cleanup:[0,55,22],room:[0,70,32],'delay-time':[100,1800,650],'delay-feedback':[0,90,28],'delay-mix':[0,50,18],'response-gap':[.8,6,2.4]};
 export function validateComposition(input){
   if(!input||input.format!=='line-resonator'||input.version!==1)throw new Error('Choose a Filigrana composition file.');
-  if(typeof input.image?.src!=='string'||!/^data:image\/(jpeg|png|webp);base64,[a-zA-Z0-9+/=]+$/.test(input.image.src)||input.image.src.length>35e6)throw new Error('The composition needs an embedded JPEG, PNG, or WebP image.');
+  if(typeof input.image?.src!=='string'||!/^data:image\/(jpeg|png|webp|bmp|x-ms-bmp);base64,[a-zA-Z0-9+/=]+$/.test(input.image.src)||input.image.src.length>35e6)throw new Error('The composition needs an embedded BMP, JPEG, PNG, or WebP image.');
   if(!Array.isArray(input.travellers)||input.travellers.length!==3)throw new Error('The composition must contain three travellers.');
   const controls={};for(const [key,[min,max,fallback]]of Object.entries(CONTROL_LIMITS))controls[key]=number(input.controls?.[key],min,max,fallback);
   controls.branch=['flow','explore','random'].includes(input.controls?.branch)?input.controls.branch:'flow';

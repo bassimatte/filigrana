@@ -550,9 +550,9 @@ async function renderMp4Offline(){
     for(const t of active()){t.phrasing.reset();soundEdge(t);}answer();
     draw();
     if(renderFormat==='mp4'){
-      const dimensions={landscape:[1920,1080],square:[1080,1080],portrait:[1080,1920]}[$('video-frame').value]||[1920,1080];
+      const dimensions={landscape:[3840,2160],square:[2160,2160],portrait:[2160,3840]}[$('video-frame').value]||[3840,2160];
       videoExportCanvas=document.createElement('canvas');[videoExportCanvas.width,videoExportCanvas.height]=dimensions;videoExportContext=videoExportCanvas.getContext('2d');
-      const {createOfflineMp4Export}=await import('./video-export.js?v=2');
+      const {createOfflineMp4Export}=await import('./video-export.js?v=3');
       exporter=await createOfflineMp4Export({canvas:videoExportCanvas,width:dimensions[0],height:dimensions[1]});
     }
     if(offlineRenderCancel)throw new DOMException('Render cancelled.','AbortError');

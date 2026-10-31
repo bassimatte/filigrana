@@ -103,7 +103,7 @@ Moonwater and Woodland use minor pentatonic; Dusk uses natural minor. Flowing an
 
 ## Render settings and live video
 
-In Settings, **Render as** selects MP4 video, 320 kbps MP3, or high-resolution 24-bit WAV. **Render length** defaults to 1 minute, with 2-, 5-, and 10-minute options. Audio is synthesized offline and encoded in a background worker; MP4 combines the animated drawing with the offline audio. All formats include the voices and effects. The video-frame selector sets landscape (16:9), square (1:1), or portrait (9:16) MP4 framing.
+In Settings, **Render as** selects MP4 video, 320 kbps MP3, or high-resolution 24-bit WAV. **Render length** defaults to 1 minute, with 2-, 5-, and 10-minute options. Audio is synthesized offline and encoded in a background worker; MP4 combines the animated drawing with the offline audio. All formats include the voices and effects. Offline MP4 renders use 4K dimensions: 3840×2160 landscape, 2160×2160 square, or 2160×3840 portrait. Live Video capture remains 1080p. The video-frame selector sets landscape (16:9), square (1:1), or portrait (9:16) framing.
 
 The MP3 and MP4 encoder bundles are included under `dist/vendor/`. [Encoder credits](https://bassimatte.github.io/filigrana/licenses.html) list the upstream licenses and notices; the lamejs source package is included there. Video uses Mediabunny 1.65.0 with its AAC encoder extension, and exports standard H.264/AAC MP4. **Render** starts a fresh journey from its saved origins and creates the selected file faster than real time. **Video** captures the live performance in real time; stop it manually or let it auto-save after ten minutes. Renders and live videos include a `.line-score.json` sidecar with the composition settings and embedded drawing.
 

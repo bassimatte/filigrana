@@ -54,7 +54,7 @@ export async function createMp4Export({canvas,audioTrack,renderFrame,width,heigh
 }
 
 export async function createOfflineMp4Export({canvas,width,height}){
-  const videoQuality=new Quality({bitrate:2_500_000}),audioQuality=new Quality({bitrate:160_000});
+  const videoQuality=new Quality({bitrate:16_000_000}),audioQuality=new Quality({bitrate:160_000});
   await ensureMp4Codecs(width,height,videoQuality,audioQuality);
   const target=new BufferTarget(),output=new Output({format:new Mp4OutputFormat({fastStart:false}),target});
   const videoSource=new CanvasSource(canvas,{codec:'avc',quality:videoQuality,keyFrameInterval:2});

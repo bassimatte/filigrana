@@ -4,17 +4,16 @@ const WEBSITE_ID='b2300e0b-bc69-49d7-ad05-06f980b5ed38';
 const SCRIPT_URL='https://cloud.umami.is/script.js';
 const EVENT_PREFIX='filigrana_';
 const SCHEMA=Object.freeze({
-  listen_requested:{source:['listen','audio_export','video_recording']},
-  audio_started:{source:['listen','audio_export','video_recording']},
+  listen_requested:{source:['listen','video_recording']},
+  audio_started:{source:['listen','video_recording']},
   audio_failed:{reason:['start_error','unsupported']},
-  listen_milestone:{duration:['30s','2m','5m'],source:['listen','audio_export','video_recording']},
+  listen_milestone:{duration:['30s','2m','5m'],source:['listen','video_recording']},
   drawing_loaded:{source:['starter','upload','composition']},
   paths_analyzed:{outcome:['found','none','failed']},
   preset_selected:{preset:['floating','still','flowing','glassgarden','moonwater','woodland','softfocus','lanterns','dusk','crystalroom']},
   instrument_selected:{instrument:['bell','piano','harp','kalimba','marimba','bowl','flute','strings','glass','handpan','bassclarinet','vibraphone','bow','pluck']},
   scale_selected:{scale:['pentatonic','minorPentatonic','major','minor','chromatic','free'],scope:['voice','all']},
   visualization_selected:{mode:['threads','trace','afterimage','halos','waves','dew','mist']},
-  audio_export_completed:{format:['mp3','wav'],duration:['short','medium','long']},
   video_recording_completed:{duration:['short','medium','long']},
   render_started:{duration:['short','medium','long'],format:['mp3','wav','mp4']},
   render_completed:{duration:['short','medium','long'],format:['mp3','wav','mp4']},

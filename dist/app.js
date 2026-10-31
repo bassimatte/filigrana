@@ -2,7 +2,6 @@ import {ThreadLights,drawThreads} from './luminous-threads.js?v=19';
 import {drawAmbient} from './ambient-views.js?v=3';
 import {DrawingView} from './drawing-view.js?v=12';
 import {PlaybackClock} from './playback-clock.js?v=9';
-import {MixRecorder,canRecord} from './recorder.js?v=7';
 import {PRESETS,matchingPreset} from './presets.js?v=7';
 import {inkMask,thin,graphFromSkeleton,resonance,chooseEdge,pointOnEdge} from './geometry.js';
 import {Resonator} from './audio.js?v=7';
@@ -11,14 +10,14 @@ import {Traveller,defaultStarts} from './traveller.js?v=3';
 import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=7';
 import {Conversation,pieceEnvelope} from './performance.js?v=2';
 import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=15';
-import {trackFiligranaEvent} from './analytics.js?v=2';
+import {trackFiligranaEvent} from './analytics.js?v=3';
 import {encodeOfflineAudioBuffer} from './offline-audio-export.js?v=1';
 const icon=name=>`<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-${name}"/></svg>`;
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 let audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i)),conversation=new Conversation();
 let listenSessionTimers=[],listenSessionId=0;
 const sentListenMilestones=new Set();
-let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,visualMode='threads',totalTime=0,loadId=0,pathVector=null,previewGraph=null,previewPath=null,previewTimer=null,previewId=0,finished=false,lastSpeaker=null,pathFeedback='';
+let image=null,graph=null,selected=0,playing=false,busy=false,visualMode='threads',totalTime=0,loadId=0,pathVector=null,previewGraph=null,previewPath=null,previewTimer=null,previewId=0,finished=false,lastSpeaker=null,pathFeedback='';
 const view=new DrawingView(),threadLights=new ThreadLights();
 const STARTER_IMAGES=[
   {name:'adiantum pedatum.jpg',sensitivity:70},
@@ -45,18 +44,10 @@ $('visual-mode').value=visualMode;
 function applyVisualMode(){ hoverVoice=null;$('canvas-wrap').classList.toggle('luminous',visualMode==='threads');document.documentElement.classList.toggle('luminous-mode',visualMode==='threads');paintPaths();draw(); }
 applyVisualMode();
  $('visual-mode').onchange=()=>{visualMode=$('visual-mode').value;try{localStorage.setItem('filigrana-visual-mode',visualMode);}catch{}trackFiligranaEvent('visualization_selected',{mode:visualMode});applyVisualMode();};
-let recorder=null,pendingRecorder=null,recordPreparing=false,recordSaving=false,recordGeneration=0,recordingStartedAt=0,recordingElapsed=0;
 let videoCapture=null,videoDestination=null,videoExportCanvas=null,videoExportContext=null,videoPreparing=false,videoRecording=false,videoSaving=false,videoGeneration=0,videoStartedAt=0,videoElapsed=0,offlineRender=false,offlineRenderCancel=false,offlineRenderProgress=0,offlineRenderAbort=null;
-try{const saved=localStorage.getItem('filigrana-recording-format');if(['mp3','wav'].includes(saved))$('record-format').value=saved;}catch{}
 try{const saved=localStorage.getItem('filigrana-video-frame');if(['landscape','square','portrait'].includes(saved))$('video-frame').value=saved;}catch{}
 try{const saved=localStorage.getItem('filigrana-render-duration');if(['60','120','300','600'].includes(saved))$('render-duration').value=saved;}catch{}
 try{const saved=localStorage.getItem('filigrana-render-format');if(['mp4','mp3','wav'].includes(saved))$('render-format').value=saved;}catch{}
-function recordingInfo(){
-  const rate=(Math.min($('record-format').value==='mp3'?48000:192000,audio.ctx?.sampleRate||48000)/1000).toLocaleString('en-US',{maximumFractionDigits:1});
-  $('record-format-info').textContent=canRecord()?`${$('record-format').value==='wav'?'24-bit': '320 kbps'} · ${rate} kHz · stereo`:'Recording is unavailable in this browser.';
-  $('record-format').disabled=recordPreparing||recordSaving||recording||videoPreparing||videoRecording||videoSaving;
-}
-$('record-format').onchange=()=>{try{localStorage.setItem('filigrana-recording-format',$('record-format').value);}catch{}recordingInfo();};
 $('video-frame').onchange=()=>{try{localStorage.setItem('filigrana-video-frame',$('video-frame').value);}catch{}};
 $('render-duration').onchange=()=>{try{localStorage.setItem('filigrana-render-duration',$('render-duration').value);}catch{}};
 $('render-format').onchange=()=>{try{localStorage.setItem('filigrana-render-format',$('render-format').value);}catch{}uiState();};
@@ -159,13 +150,13 @@ function soundEdge(t){
   if(s.interaction==='conversation')conversation.offer(t.id,note);else perform(t,note);
 }
 function uiState(){
-  $('play-label').textContent=playing?'Pause':recordPreparing||videoPreparing?'Cancel':finished?'Listen again':'Listen';$('play-icon').innerHTML=icon(playing?'pause':recordPreparing||videoPreparing?'close':'play');
+  $('play-label').textContent=playing?'Pause':videoPreparing?'Cancel':finished?'Listen again':'Listen';$('play-icon').innerHTML=icon(playing?'pause':videoPreparing?'close':'play');
   $('state').textContent=busy?'ANALYSING':!image?'UPLOAD DRAWING':playing?`${active().length} TRAVELLING`:finished?'FINISHED':graph?.edges.length?'READY':'NO PATHS';
-  $('play').disabled=busy||!active().length||videoPreparing&&!playing;$('reset').disabled=busy||videoPreparing||!travellers.some(t=>t.origin);$('reset').hidden=recording||recordSaving||videoRecording||videoSaving;$('record').disabled=recordPreparing||recordSaving||videoPreparing||videoRecording||videoSaving||busy||!active().length||!canRecord();
-  $('record-label').textContent=recordPreparing?'Preparing…':recordSaving?'Saving…':recording?'Save recording':'Record';$('record-icon').innerHTML=icon(recordPreparing||recordSaving?'loader':recording?'stop':'record');$('record').setAttribute('aria-pressed',String(recording));$('record').setAttribute('aria-busy',String(recordPreparing||recordSaving));$('record-indicator').hidden=!(recording||videoRecording);$('recording-monitor').hidden=!(recording||recordSaving||videoRecording||videoSaving);recordingInfo();$('record').classList.toggle('recording',recording);$('record').classList.toggle('busy',recordPreparing||recordSaving);
-  $('record-video').disabled=offlineRender||recordPreparing||recording||recordSaving||videoSaving||busy||!active().length||!canRecordVideo();$('video-record-label').textContent=videoPreparing?'Preparing…':videoRecording?'Stop':videoSaving?'Saving…':'Video';$('record-video').setAttribute('aria-label',videoPreparing?'Cancel MP4 preparation':videoRecording?'Stop MP4 recording':videoSaving?'Saving MP4':'Record MP4 video');$('record-video').title=canRecordVideo()?'Record an H.264 MP4 with AAC audio':'MP4 video encoding requires WebCodecs H.264 support in this browser';$('record-video').setAttribute('aria-pressed',String(videoRecording));$('record-video').setAttribute('aria-busy',String(videoPreparing||videoSaving));$('record-video').classList.toggle('recording',videoRecording);$('record-video').classList.toggle('busy',videoPreparing||videoSaving);
+  $('play').disabled=busy||!active().length||videoPreparing&&!playing;$('reset').disabled=busy||videoPreparing||!travellers.some(t=>t.origin);$('reset').hidden=videoRecording||videoSaving;
+  $('record-indicator').hidden=!videoRecording;$('recording-monitor').hidden=!(videoRecording||videoSaving);
+  $('record-video').disabled=offlineRender||videoSaving||busy||!active().length||!canRecordVideo();$('video-record-label').textContent=videoPreparing?'Preparing…':videoRecording?'Stop':videoSaving?'Saving…':'Video';$('record-video').setAttribute('aria-label',videoPreparing?'Cancel video preparation':videoRecording?'Stop live video capture':videoSaving?'Saving MP4':'Capture live MP4 video');$('record-video').title=canRecordVideo()?'Capture live video as H.264 MP4 with AAC audio':'MP4 video encoding requires WebCodecs H.264 support in this browser';$('record-video').setAttribute('aria-pressed',String(videoRecording));$('record-video').setAttribute('aria-busy',String(videoPreparing||videoSaving));$('record-video').classList.toggle('recording',videoRecording);$('record-video').classList.toggle('busy',videoSaving);
   const selectedRenderFormat=$('render-format').value,renderAvailable=selectedRenderFormat==='mp4'?canRecordVideo():canRenderAudio();
-  $('render-video').disabled=(!offlineRender&&(!active().length||busy||!renderAvailable))||recordPreparing||recording||recordSaving||videoPreparing||videoRecording||videoSaving;
+  $('render-video').disabled=(!offlineRender&&(!active().length||busy||!renderAvailable))||videoPreparing||videoRecording||videoSaving;
   $('render-video-label').textContent=offlineRender?offlineRenderCancel?'Cancelling…':`Render ${offlineRenderProgress}%`:'Render';$('render-video').setAttribute('aria-label',offlineRender?'Cancel offline render':`Render ${selectedRenderFormat==='mp4'?'video':'audio'} without real-time playback`);$('render-video').title=selectedRenderFormat==='mp4'?'Render an H.264 MP4 with AAC audio':selectedRenderFormat==='wav'?'Render a 24-bit WAV audio file':'Render a 320 kbps MP3 audio file';$('render-video').setAttribute('aria-busy',String(offlineRender));
   $('video-frame').disabled=videoPreparing||videoRecording||videoSaving;
   $('save-score').disabled=busy||!image||!graph?.edges.length;
@@ -178,7 +169,7 @@ function uiState(){
   $('canvas-note').textContent=!image?'Upload a drawing to begin':busy?'Reading drawing…':'No paths detected';
   voiceOverview();audio.setActiveCount(active().length);
 }
-function stop(){playbackClock.stop();playing=false;clearListenMilestones();audio.silence();conversation.reset();lastSpeaker=null;if(recordPreparing)cancelRecordingPreparation();else if(recording)endRecording();if(videoPreparing)cancelVideoPreparation();else if(videoRecording)endVideoRecording();uiState();}
+function stop(){playbackClock.stop();playing=false;clearListenMilestones();audio.silence();conversation.reset();lastSpeaker=null;if(videoPreparing)cancelVideoPreparation();else if(videoRecording)endVideoRecording();uiState();}
 function place(t,edgeId,from,distance=0){threadLights.clear(t.id);audio.silenceChannel(t.id);conversation.remove(t.id);t.place(edgeId,from,distance);soundEdge(t);uiState();draw();}
 function paintRange(input){const min=+(input.getAttribute('min')||0),max=+(input.getAttribute('max')||100),value=+input.value;input.style.setProperty('--range-progress',`${Math.max(0,Math.min(100,(value-min)/(max-min)*100))}%`);}
 function refreshRanges(){document.querySelectorAll('input[type=range]').forEach(paintRange);}
@@ -360,13 +351,13 @@ function frame(){
   sx.clearRect(0,0,scope.width,scope.height);sx.strokeStyle=palette.green;sx.lineWidth=1.5;sx.beginPath();
   if(audio.analyser&&playing){const data=new Uint8Array(audio.analyser.fftSize);audio.analyser.getByteTimeDomainData(data);for(let i=0;i<data.length;i++){const x=i/(data.length-1)*scope.width,y=scope.height/2+(data[i]-128)/128*scope.height*.46;i?sx.lineTo(x,y):sx.moveTo(x,y);}}
   else{sx.moveTo(0,scope.height/2);sx.lineTo(scope.width,scope.height/2);}sx.stroke();requestAnimationFrame(frame);
-  if(recording||recordSaving||videoRecording||videoSaving)drawRecordingMonitor();
+  if(videoRecording||videoSaving)drawRecordingMonitor();
 }
 function drawRecordingMonitor(){
   const canvas=$('recording-waveform'),context=canvas.getContext('2d'),width=canvas.width,height=canvas.height;context.clearRect(0,0,width,height);context.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#a94c2c';context.lineWidth=1.5;context.beginPath();
-  const activeCapture=recording||videoRecording,data=new Uint8Array(audio.analyser?.fftSize||128);if(activeCapture&&audio.analyser)audio.analyser.getByteTimeDomainData(data);else data.fill(128);
+  const data=new Uint8Array(audio.analyser?.fftSize||128);if(videoRecording&&audio.analyser)audio.analyser.getByteTimeDomainData(data);else data.fill(128);
   for(let i=0;i<data.length;i++){const x=i/(data.length-1)*width,y=height/2+(data[i]-128)/128*height*.42;i?context.lineTo(x,y):context.moveTo(x,y);}context.stroke();
-  const elapsed=recording?recordingElapsed+(performance.now()-recordingStartedAt)/1000:videoRecording?videoElapsed+(performance.now()-videoStartedAt)/1000:recordSaving?recordingElapsed:videoElapsed,total=Math.floor(elapsed),minutes=String(Math.floor(total/60)).padStart(2,'0'),seconds=String(total%60).padStart(2,'0');$('recording-elapsed').textContent=`${minutes}:${seconds}`;
+  const elapsed=videoRecording?videoElapsed+(performance.now()-videoStartedAt)/1000:videoElapsed,total=Math.floor(elapsed),minutes=String(Math.floor(total/60)).padStart(2,'0'),seconds=String(total%60).padStart(2,'0');$('recording-elapsed').textContent=`${minutes}:${seconds}`;
 }
 function startPlayback(source='listen',trackStart=true){
   if(finished)restart();playing=true;playbackClock.start();const s=settings();conversation.reset();lastSpeaker=null;
@@ -376,7 +367,6 @@ function startPlayback(source='listen',trackStart=true){
 }
 $('play').onclick=async()=>{
   if(playing){stop();return;}
-  if(recordPreparing){cancelRecordingPreparation();uiState();return;}
   if(videoPreparing){cancelVideoPreparation();uiState();return;}
   if(!active().length||busy)return;
   trackFiligranaEvent('listen_requested',{source:'listen'});
@@ -446,7 +436,7 @@ $('load-score-trigger').onclick=()=>$('load-score').click();
 document.querySelectorAll('.control-group').forEach(group=>group.addEventListener('toggle',()=>{
   if(group.open)document.querySelectorAll('.control-group[open]').forEach(other=>{if(other!==group)other.open=false;});
 }));
-const nonMoodControls=new Set(['preset','record-format','render-format','render-duration','video-frame']);
+const nonMoodControls=new Set(['preset','render-format','render-duration','video-frame']);
 document.addEventListener('input',event=>{if(!nonMoodControls.has(event.target.id)&&event.target.matches('input[type=range],select'))customMood();});
 document.addEventListener('change',event=>{if(!nonMoodControls.has(event.target.id)&&event.target.matches('select,#delay-enabled'))customMood();});
 $('analyse').onclick=analyse;
@@ -500,8 +490,6 @@ $('load-score').onchange=async event=>{
     customMood();updateEffects();updateLabels();uiState();draw();trackFiligranaEvent('composition_action',{action:'loaded'});message('Composition loaded.');
   }catch(error){message(`Could not load the composition: ${error.message}`);}finally{event.target.value='';uiState();}
 };
-function cancelRecordingPreparation(){recordGeneration++;pendingRecorder?.cancel();pendingRecorder=null;recordPreparing=false;message();}
-function endRecording(){if(!recording)return;recordingElapsed+=(performance.now()-recordingStartedAt)/1000;recordingStartedAt=0;recording=false;recordSaving=true;uiState();message('Saving recording…');recorder.stop();}
 function canRecordVideo(){const Context=window.AudioContext||window.webkitAudioContext;return typeof VideoEncoder!=='undefined'&&typeof MediaStream!=='undefined'&&!!Context&&typeof Context.prototype.createMediaStreamDestination==='function';}
 function canRenderAudio(){return typeof Worker!=='undefined'&&Boolean(window.OfflineAudioContext||window.webkitOfflineAudioContext);}
 function releaseVideoCapture(){
@@ -531,7 +519,7 @@ async function renderMp4Offline(){
   if(offlineRender){offlineRenderCancel=true;offlineRenderAbort?.abort();$('render-video-label').textContent='Cancelling…';return;}
   const renderFormat=$('render-format').value;
   const duration=+$('render-duration').value,originalPieceLength=$('duration').value;
-  if(recordPreparing||recording||recordSaving||videoPreparing||videoRecording||videoSaving||busy||!active().length||(renderFormat==='mp4'?!canRecordVideo():!canRenderAudio()))return;
+  if(videoPreparing||videoRecording||videoSaving||busy||!active().length||(renderFormat==='mp4'?!canRecordVideo():!canRenderAudio()))return;
   trackFiligranaEvent('render_started',{duration:durationBucket(duration),format:renderFormat});
   const buttonStates=[...document.querySelectorAll('button,input,select')].filter(element=>element.id!=='render-video').map(element=>[element,element.disabled]);
   const previous={audio,travellers,conversation,playing,totalTime,finished,lastSpeaker};
@@ -606,42 +594,10 @@ async function renderMp4Offline(){
 let videoLimitTimer=null;
 let videoComposition=null;
 $('render-video').onclick=renderMp4Offline;
-$('record').onclick=async()=>{
-  if(recording){endRecording();return;}
-  if(recordPreparing||recordSaving||busy||!active().length||!canRecord())return;
-  const shouldStart=!playing,generation=++recordGeneration;let session;
-  if(shouldStart)trackFiligranaEvent('listen_requested',{source:'audio_export'});
-  recordPreparing=true;uiState();message('Preparing recording…');
-  let composition;
-  const reset=()=>{recorder=null;pendingRecorder=null;recordPreparing=false;recordSaving=false;recording=false;recordingStartedAt=0;recordingElapsed=0;uiState();};
-  try{
-    composition=await compositionSnapshot();if(generation!==recordGeneration)return;
-    await audio.init();await playbackClock.prepare(audio.ctx,audio.master);if(generation!==recordGeneration)return;
-    session=new MixRecorder(audio.ctx,audio.master,{
-      format:$('record-format').value,
-      onComplete:async({blob,extension})=>{
-        if(generation!==recordGeneration)return;recording=false;recordSaving=true;uiState();
-        const base=`filigrana-${new Date().toISOString().slice(0,19).replaceAll(':','-')}`;download(blob,`${base}.${extension}`);
-        try{download(new Blob([JSON.stringify(composition.score)],{type:'application/json'}),`${base}.line-score.json`);trackFiligranaEvent('audio_export_completed',{format:extension,duration:durationBucket(recordingElapsed)});reset();message('Recording and composition saved. The sidecar includes its drawing.');}
-        catch(error){reset();message(`Recording saved, but its composition sidecar could not be saved: ${error.message}`);}
-      },
-      onError:error=>{if(generation!==recordGeneration)return;reset();message(`Could not save recording: ${error.message}`);},
-      onLimit:()=>{recordingElapsed+=(performance.now()-recordingStartedAt)/1000;recordingStartedAt=0;recording=false;recordSaving=true;uiState();message('Saving recording…');}
-    });
-    pendingRecorder=session;await session.start();
-    if(generation!==recordGeneration||busy||!active().length||(!shouldStart&&!playing)){session.cancel();if(generation===recordGeneration)reset();return;}
-    pendingRecorder=null;recorder=session;recordPreparing=false;recording=true;
-    recordingStartedAt=performance.now();recordingElapsed=0;
-    // Capture is connected before the first new note and the musical clock start.
-    if(shouldStart)startPlayback('audio_export');else uiState();message('Recording…');
-  }catch(error){
-    session?.cancel();if(generation===recordGeneration){if(shouldStart&&playing)stop();reset();message(`Could not start recording: ${error.message}`);}
-  }
-};
 $('record-video').onclick=async()=>{
   if(videoPreparing){cancelVideoPreparation();return;}
   if(videoRecording){endVideoRecording();return;}
-  if(recordPreparing||recording||recordSaving||videoSaving||busy||!active().length||!canRecordVideo())return;
+  if(videoSaving||busy||!active().length||!canRecordVideo())return;
   const shouldStart=!playing,generation=++videoGeneration;let composition;
   if(shouldStart)trackFiligranaEvent('listen_requested',{source:'video_recording'});
   videoPreparing=true;videoElapsed=0;uiState();message('Preparing video…');
@@ -658,7 +614,7 @@ $('record-video').onclick=async()=>{
     if(generation!==videoGeneration){videoCapture.cancel();videoCapture=null;releaseVideoCapture();return;}
     videoPreparing=false;videoRecording=true;videoStartedAt=performance.now();videoElapsed=0;uiState();
     videoLimitTimer=setTimeout(()=>{if(videoRecording){message('Video reached the 10 minute limit. Saving…');endVideoRecording();}},600_000);
-    if(shouldStart)startPlayback('video_recording');else uiState();message('Recording MP4 video…');
+    if(shouldStart)startPlayback('video_recording');else uiState();message('Capturing live video…');
   }catch(error){
     clearTimeout(videoLimitTimer);videoCapture?.cancel();videoCapture=null;releaseVideoCapture();
     if(generation===videoGeneration){videoPreparing=false;videoRecording=false;videoSaving=false;videoStartedAt=0;videoElapsed=0;uiState();draw();message(`Could not start MP4 recording: ${error.message}`);}

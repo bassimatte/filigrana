@@ -11,9 +11,12 @@ import {Traveller,defaultStarts} from './traveller.js?v=3';
 import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=7';
 import {Conversation,pieceEnvelope} from './performance.js?v=2';
 import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=15';
+import {trackFiligranaEvent} from './analytics.js?v=1';
 const icon=name=>`<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-${name}"/></svg>`;
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 let audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i)),conversation=new Conversation();
+let listenSessionTimers=[],listenSessionId=0;
+const sentListenMilestones=new Set();
 let image=null,graph=null,selected=0,playing=false,recording=false,busy=false,visualMode='threads',totalTime=0,loadId=0,pathVector=null,previewGraph=null,previewPath=null,previewTimer=null,previewId=0,finished=false,lastSpeaker=null,pathFeedback='';
 const view=new DrawingView(),threadLights=new ThreadLights();
 const STARTER_IMAGES=[
@@ -40,7 +43,7 @@ try{
 $('visual-mode').value=visualMode;
 function applyVisualMode(){ hoverVoice=null;$('canvas-wrap').classList.toggle('luminous',visualMode==='threads');document.documentElement.classList.toggle('luminous-mode',visualMode==='threads');paintPaths();draw(); }
 applyVisualMode();
-$('visual-mode').onchange=()=>{visualMode=$('visual-mode').value;try{localStorage.setItem('filigrana-visual-mode',visualMode);}catch{}applyVisualMode();};
+ $('visual-mode').onchange=()=>{visualMode=$('visual-mode').value;try{localStorage.setItem('filigrana-visual-mode',visualMode);}catch{}trackFiligranaEvent('visualization_selected',{mode:visualMode});applyVisualMode();};
 let recorder=null,pendingRecorder=null,recordPreparing=false,recordSaving=false,recordGeneration=0,recordingStartedAt=0,recordingElapsed=0;
 let videoCapture=null,videoDestination=null,videoExportCanvas=null,videoExportContext=null,videoPreparing=false,videoRecording=false,videoSaving=false,videoGeneration=0,videoStartedAt=0,videoElapsed=0,offlineRender=false,offlineRenderCancel=false,offlineRenderProgress=0;
 try{const saved=localStorage.getItem('filigrana-recording-format');if(['mp3','wav'].includes(saved))$('record-format').value=saved;}catch{}
@@ -59,6 +62,15 @@ document.addEventListener('click',event=>{if(!recordingMenu.contains(event.targe
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&recordingMenu.hasAttribute('open')){recordingMenu.removeAttribute('open');recordingMenu.querySelector('summary').focus();}});
 const playbackClock=new PlaybackClock(advanceMusic);
 let musicDirty=false;
+function clearListenMilestones(){listenSessionId++;for(const timer of listenSessionTimers)clearTimeout(timer);listenSessionTimers=[];}
+function beginListenMilestones(source){
+  clearListenMilestones();const session=listenSessionId;
+  for(const [seconds,label]of [[30,'30s'],[120,'2m'],[300,'5m']]){
+    if(sentListenMilestones.has(label))continue;
+    listenSessionTimers.push(setTimeout(()=>{if(!playing||session!==listenSessionId)return;sentListenMilestones.add(label);trackFiligranaEvent('listen_milestone',{duration:label,source});},seconds*1000));
+  }
+}
+function durationBucket(seconds){return seconds<120?'short':seconds<300?'medium':'long';}
 let openVoice=null,drag=null,suppressClick=false;
 function voiceOverview(){
   $('voice-editor').hidden=openVoice===null;$('mix-controls').hidden=openVoice!==null;
@@ -162,7 +174,7 @@ function uiState(){
   $('canvas-note').textContent=!image?'Upload a drawing to begin':busy?'Reading drawing…':'No paths detected';
   voiceOverview();audio.setActiveCount(active().length);
 }
-function stop(){playbackClock.stop();playing=false;audio.silence();conversation.reset();lastSpeaker=null;if(recordPreparing)cancelRecordingPreparation();else if(recording)endRecording();if(videoPreparing)cancelVideoPreparation();else if(videoRecording)endVideoRecording();uiState();}
+function stop(){playbackClock.stop();playing=false;clearListenMilestones();audio.silence();conversation.reset();lastSpeaker=null;if(recordPreparing)cancelRecordingPreparation();else if(recording)endRecording();if(videoPreparing)cancelVideoPreparation();else if(videoRecording)endVideoRecording();uiState();}
 function place(t,edgeId,from,distance=0){threadLights.clear(t.id);audio.silenceChannel(t.id);conversation.remove(t.id);t.place(edgeId,from,distance);soundEdge(t);uiState();draw();}
 function paintRange(input){const min=+(input.getAttribute('min')||0),max=+(input.getAttribute('max')||100),value=+input.value;input.style.setProperty('--range-progress',`${Math.max(0,Math.min(100,(value-min)/(max-min)*100))}%`);}
 function refreshRanges(){document.querySelectorAll('input[type=range]').forEach(paintRange);}
@@ -201,7 +213,7 @@ function mountTravellers(){
     };
     $(`place-${t.id}`).onclick=()=>{selected=t.id;openVoice=null;uiState();updateLabels();draw();canvas.focus();message('Click a line to set this voice’s start.');};
     $(`instrument-${t.id}`).onchange=()=>{
-      audio.silenceChannel(t.id);conversation.remove(t.id);t.instrument=$(`instrument-${t.id}`).value;t.phrasing.reset();t.heardPitch=null;syncTraveller(t);updateLabels();soundEdge(t);voiceOverview();draw();
+      audio.silenceChannel(t.id);conversation.remove(t.id);t.instrument=$(`instrument-${t.id}`).value;trackFiligranaEvent('instrument_selected',{instrument:t.instrument});t.phrasing.reset();t.heardPitch=null;syncTraveller(t);updateLabels();soundEdge(t);voiceOverview();draw();
       message();
     };
     $(`enabled-${t.id}`).onchange=()=>{
@@ -211,6 +223,7 @@ function mountTravellers(){
     };
     for(const kind of ['octave','scale'])$(`${kind}-${t.id}`).onchange=()=>{
       t[kind]=kind==='octave'?+$(`${kind}-${t.id}`).value:$(`${kind}-${t.id}`).value;
+      if(kind==='scale')trackFiligranaEvent('scale_selected',{scale:t.scale,scope:'voice'});
       conversation.remove(t.id);
       if(kind==='scale')syncScaleControl();
       if(playing&&t.enabled&&t.walker&&!isNoteVoice(t.instrument)){const hz=pitch(t,graph.edges[t.walker.edge]);audio.tune(hz,t.ring,t.id);t.heardPitch=hz;}
@@ -220,10 +233,11 @@ function mountTravellers(){
 }
 $('global-scale').onchange=()=>{
   const scale=$('global-scale').value;if(!Object.hasOwn(SCALES,scale))return;
+  trackFiligranaEvent('scale_selected',{scale,scope:'all'});
   for(const t of travellers){t.scale=scale;$(`scale-${t.id}`).value=scale;conversation.remove(t.id);if(playing&&t.enabled&&t.walker&&!isNoteVoice(t.instrument)){const hz=pitch(t,graph.edges[t.walker.edge]);audio.tune(hz,t.ring,t.id);t.heardPitch=hz;}}
   syncScaleControl();customMood();draw();message();
 };
-async function loadImage(src,name,sensitivity=null){
+async function loadImage(src,name,sensitivity=null,source='upload'){
   const id=++loadId;stop();clearPathPreview();pathFeedback='';$('suggest-sensitivity').hidden=true;busy=true;uiState();message('Reading the image…');
   try{
     if(Number.isFinite(sensitivity)){$('sensitivity').value=sensitivity;$('sensitivity-value').textContent=String(sensitivity);paintRange($('sensitivity'));}
@@ -231,18 +245,20 @@ async function loadImage(src,name,sensitivity=null){
     const scale=Math.min(1,960/Math.max(img.width,img.height));drawingWidth=Math.round(img.width*scale);drawingHeight=Math.round(img.height*scale);
     if(/\.bmp$/i.test(name)||/^data:image\/(?:x-ms-)?bmp[;,]/i.test(src)){const normalized=document.createElement('canvas');normalized.width=drawingWidth;normalized.height=drawingHeight;normalized.getContext('2d').drawImage(img,0,0,drawingWidth,drawingHeight);img.src=normalized.toDataURL('image/png');await img.decode();}
     image=img;view.setDrawing(drawingWidth,drawingHeight);updateZoomControls();
-    $('image-name').textContent=name;await analyse();
+    $('image-name').textContent=name;await analyse();if(id===loadId)trackFiligranaEvent('drawing_loaded',{source});
   }catch(e){busy=false;message(`Could not read this image. Try a BMP, JPEG, PNG, or WebP. ${e.message}`);uiState();}
 }
 function loadStarterImage(){
   const starter=STARTER_IMAGES[Math.floor(Math.random()*STARTER_IMAGES.length)];
-  loadImage(new URL(`./images/${encodeURIComponent(starter.name)}`,import.meta.url).href,starter.name,starter.sensitivity);
+  loadImage(new URL(`./images/${encodeURIComponent(starter.name)}`,import.meta.url).href,starter.name,starter.sensitivity,'starter');
 }
 async function analyse(){
   if(!image)return;clearPathPreview();stop();threadLights.clear();pathFeedback='';$('suggest-sensitivity').hidden=true;busy=true;uiState();message('Finding ink, thinning lines, and measuring the paths…');
   await new Promise(r=>setTimeout(r,35));
+  let analysisOutcome='failed';
   try{
     graph=extractGraph(+$('sensitivity').value,+$('cleanup').value);totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.setGraph(graph);}
+    analysisOutcome=graph.edges.length?'found':'none';
     paintPaths();
     $('junction-count').textContent=`${graph.junctions.length} junctions`;
     if(graph.edges.length){
@@ -261,7 +277,7 @@ async function analyse(){
       message('No usable lines found. Increase ink sensitivity, or try a clearer drawing on plain paper.');$('canvas-note').textContent='No paths detected';$('frequency').textContent='—';$('edge-length').textContent='Try another sensitivity';
     }
   }catch(e){graph=null;pathVector=null;pathFeedback='Path analysis failed';for(const t of travellers)t.setGraph(null);message(`Could not extract paths: ${e.message}`);}
-  busy=false;uiState();draw();
+  trackFiligranaEvent('paths_analyzed',{outcome:analysisOutcome});busy=false;uiState();draw();
 }
 function locateClick(event){
   if(!graph?.edges.length||busy)return;
@@ -348,18 +364,20 @@ function drawRecordingMonitor(){
   for(let i=0;i<data.length;i++){const x=i/(data.length-1)*width,y=height/2+(data[i]-128)/128*height*.42;i?context.lineTo(x,y):context.moveTo(x,y);}context.stroke();
   const elapsed=recording?recordingElapsed+(performance.now()-recordingStartedAt)/1000:videoRecording?videoElapsed+(performance.now()-videoStartedAt)/1000:recordSaving?recordingElapsed:videoElapsed,total=Math.floor(elapsed),minutes=String(Math.floor(total/60)).padStart(2,'0'),seconds=String(total%60).padStart(2,'0');$('recording-elapsed').textContent=`${minutes}:${seconds}`;
 }
-function startPlayback(){
+function startPlayback(source='listen',trackStart=true){
   if(finished)restart();playing=true;playbackClock.start();const s=settings();conversation.reset();lastSpeaker=null;
   audio.setActiveCount(active().length);audio.setVolume(s.volume*pieceEnvelope(totalTime,s.duration).gain);
-  for(const t of active()){audio.setTraveller(t.id,t.volume,t.pan);t.phrasing.reset();soundEdge(t);}answer();uiState();
+  for(const t of active()){audio.setTraveller(t.id,t.volume,t.pan);t.phrasing.reset();soundEdge(t);}answer();
+  if(trackStart)trackFiligranaEvent('audio_started',{source});beginListenMilestones(source);uiState();
 }
 $('play').onclick=async()=>{
   if(playing){stop();return;}
   if(recordPreparing){cancelRecordingPreparation();uiState();return;}
   if(videoPreparing){cancelVideoPreparation();uiState();return;}
   if(!active().length||busy)return;
-  try{await audio.init();await playbackClock.prepare(audio.ctx,audio.master);startPlayback();message();}
-  catch(e){stop();message(`Could not start audio: ${e.message}`);}
+  trackFiligranaEvent('listen_requested',{source:'listen'});
+  try{await audio.init();await playbackClock.prepare(audio.ctx,audio.master);startPlayback('listen');message();}
+  catch(e){trackFiligranaEvent('audio_failed',{reason:/support|AudioContext/i.test(e.message)?'unsupported':'start_error'});stop();message(`Could not start audio: ${e.message}`);}
 };
 function restart(){threadLights.clear();playbackClock.reset();audio.silence();conversation.reset();lastSpeaker=null;totalTime=0;finished=false;for(const t of travellers){t.seed=$('seed').value;t.restart();}if(playing){audio.setVolume(settings().volume*pieceEnvelope(0,settings().duration).gain);for(const t of active())soundEdge(t);answer();}uiState();draw();}
 $('reset').onclick=()=>{restart();message();};
@@ -419,7 +437,7 @@ function applyPreset(key){
 }
 function customMood(){$('preset').value=matchingPreset(travellers,{room:+$('room').value,pace:+$('speed').value,gap:+$('response-gap').value});}
 $('preset').innerHTML=Object.entries(PRESETS).map(([key,p])=>`<option value="${key}">${key==='still'?'Still · calm trio':p.name}</option>`).join('')+'<option value="custom" disabled>Custom</option>';
-$('preset').onchange=()=>{if(Object.hasOwn(PRESETS,$('preset').value)){applyPreset($('preset').value);message();}};
+$('preset').onchange=()=>{if(Object.hasOwn(PRESETS,$('preset').value)){trackFiligranaEvent('preset_selected',{preset:$('preset').value});applyPreset($('preset').value);message();}};
 $('load-score-trigger').onclick=()=>$('load-score').click();
 document.querySelectorAll('.control-group').forEach(group=>group.addEventListener('toggle',()=>{
   if(group.open)document.querySelectorAll('.control-group[open]').forEach(other=>{if(other!==group)other.open=false;});
@@ -454,7 +472,7 @@ $('save-score').onclick=async()=>{
   if(!image||!graph?.edges.length||busy)return;$('save-score').disabled=true;
   try{
     const {score,drawingBlob}=await compositionSnapshot();download(new Blob([JSON.stringify(score)],{type:'application/json'}),'filigrana.line-score.json');
-    download(drawingBlob,drawingFilename(drawingBlob));message('Composition and image saved.');
+    download(drawingBlob,drawingFilename(drawingBlob));trackFiligranaEvent('composition_action',{action:'saved'});message('Composition and image saved.');
   }catch(error){message(`Could not save the composition: ${error.message}`);}finally{uiState();}
 };
 $('load-score').onchange=async event=>{
@@ -466,7 +484,7 @@ $('load-score').onchange=async event=>{
     const units={speed:'%',tuning:' Hz',volume:'%',sensitivity:'',room:'%','delay-time':' ms','delay-feedback':'%','delay-mix':'%','response-gap':' s'};
     for(const [key,unit]of Object.entries(units))$(`${key}-value`).textContent=$(key).value+unit;
     for(const t of travellers){const {origin,...expression}=score.travellers[t.id];Object.assign(t,expression);t.seed=String(numericSeed(score.controls.seed));syncTraveller(t);}
-    await loadImage(score.image.src,score.image.name);
+    await loadImage(score.image.src,score.image.name,null,'composition');
     if(image?.src!==score.image.src||!graph?.edges.length)throw new Error('The saved image could not be read.');
     for(const t of travellers){
       const origin=score.travellers[t.id].origin;if(!origin)continue;const e=graph.edges[origin.edgeId];
@@ -474,7 +492,7 @@ $('load-score').onchange=async event=>{
       if(matched)t.place(origin.edgeId,origin.from,origin.distance);
       else{let nearest=Infinity,choice=null;for(const edge of graph.edges)for(let i=0;i<edge.points.length;i++){const p=edge.points[i],d=Math.hypot(p.x-origin.x*graph.w,p.y-origin.y*graph.h);if(d<nearest){nearest=d;choice={edge,i};}}if(choice)t.place(choice.edge.id,choice.edge.a,choice.edge.lengths[choice.i]);}
     }
-    customMood();updateEffects();updateLabels();uiState();draw();message('Composition loaded.');
+    customMood();updateEffects();updateLabels();uiState();draw();trackFiligranaEvent('composition_action',{action:'loaded'});message('Composition loaded.');
   }catch(error){message(`Could not load the composition: ${error.message}`);}finally{event.target.value='';uiState();}
 };
 function cancelRecordingPreparation(){recordGeneration++;pendingRecorder?.cancel();pendingRecorder=null;recordPreparing=false;message();}
@@ -497,7 +515,7 @@ async function endVideoRecording(){
     if(!capture)throw new Error('The MP4 encoder stopped unexpectedly.');
     const blob=await capture.stop();if(generation!==videoGeneration)return;releaseVideoCapture();
     const base=`filigrana-${new Date().toISOString().slice(0,19).replaceAll(':','-')}`;
-    download(blob,`${base}.mp4`);download(new Blob([JSON.stringify(videoComposition.score)],{type:'application/json'}),`${base}.line-score.json`);
+    download(blob,`${base}.mp4`);download(new Blob([JSON.stringify(videoComposition.score)],{type:'application/json'}),`${base}.line-score.json`);trackFiligranaEvent('video_recording_completed',{duration:durationBucket(videoElapsed)});
     videoSaving=false;videoElapsed=0;uiState();draw();message('MP4 video and composition saved. The sidecar includes its drawing.');
   }catch(error){
     if(generation!==videoGeneration)return;capture?.cancel();releaseVideoCapture();videoSaving=false;videoElapsed=0;uiState();draw();message(`Could not save the MP4 video: ${error.message}`);
@@ -507,10 +525,11 @@ async function renderMp4Offline(){
   if(offlineRender){offlineRenderCancel=true;$('render-video-label').textContent='Cancelling…';return;}
   const duration=+$('render-duration').value,originalPieceLength=$('duration').value;
   if(recordPreparing||recording||recordSaving||videoPreparing||videoRecording||videoSaving||busy||!active().length||!canRecordVideo())return;
+  trackFiligranaEvent('render_started',{duration:durationBucket(duration)});
   const buttonStates=[...document.querySelectorAll('button,input,select')].filter(element=>element.id!=='render-video').map(element=>[element,element.disabled]);
   const previous={audio,travellers,conversation,playing,totalTime,finished,lastSpeaker};
   let renderAudio=null,renderContext=null,exporter=null,composition=null;
-  if(previous.playing){playbackClock.stop();previous.audio.silence();}
+  if(previous.playing){playbackClock.stop();clearListenMilestones();previous.audio.silence();}
   offlineRender=true;offlineRenderCancel=false;offlineRenderProgress=0;playing=false;uiState();
   for(const [element]of buttonStates)element.disabled=true;
   $('render-video').disabled=false;message('Preparing offline render…');
@@ -556,17 +575,18 @@ async function renderMp4Offline(){
     const blob=await exporter.finish(audioBuffer);exporter=null;
     const base=`filigrana-${new Date().toISOString().slice(0,19).replaceAll(':','-')}`;
     download(blob,`${base}.mp4`);download(new Blob([JSON.stringify(composition.score)],{type:'application/json'}),`${base}.line-score.json`);
+    trackFiligranaEvent('render_completed',{duration:durationBucket(duration)});
     message('MP4 render and composition saved. The sidecar includes its drawing.');
   }catch(error){
     if(error.name==='AbortError')message('Render cancelled.');
-    else message(`Could not render MP4: ${error.message}`);
+    else{trackFiligranaEvent('render_failed',{reason:/cannot encode|unavailable|unsupported/i.test(error.message)?'unsupported':error.name==='EncodingError'?'encoding':'unknown',duration:durationBucket(duration)});message(`Could not render MP4: ${error.message}`);}
   }finally{
     if(exporter)await exporter.cancel();
     renderVisualTime=null;offlineRender=false;offlineRenderCancel=false;offlineRenderProgress=0;$('duration').value=originalPieceLength;
     audio=previous.audio;travellers=previous.travellers;conversation=previous.conversation;totalTime=previous.totalTime;finished=previous.finished;lastSpeaker=previous.lastSpeaker;playing=false;
     releaseVideoCapture();
     for(const [element,disabled]of buttonStates)element.disabled=disabled;
-    if(previous.playing){playing=true;startPlayback();}else{playing=false;uiState();}
+    if(previous.playing){playing=true;startPlayback('listen',false);}else{playing=false;uiState();}
     draw();
   }
 }
@@ -577,6 +597,7 @@ $('record').onclick=async()=>{
   if(recording){endRecording();return;}
   if(recordPreparing||recordSaving||busy||!active().length||!canRecord())return;
   const shouldStart=!playing,generation=++recordGeneration;let session;
+  if(shouldStart)trackFiligranaEvent('listen_requested',{source:'audio_export'});
   recordPreparing=true;uiState();message('Preparing recording…');
   let composition;
   const reset=()=>{recorder=null;pendingRecorder=null;recordPreparing=false;recordSaving=false;recording=false;recordingStartedAt=0;recordingElapsed=0;uiState();};
@@ -588,7 +609,7 @@ $('record').onclick=async()=>{
       onComplete:async({blob,extension})=>{
         if(generation!==recordGeneration)return;recording=false;recordSaving=true;uiState();
         const base=`filigrana-${new Date().toISOString().slice(0,19).replaceAll(':','-')}`;download(blob,`${base}.${extension}`);
-        try{download(new Blob([JSON.stringify(composition.score)],{type:'application/json'}),`${base}.line-score.json`);reset();message('Recording and composition saved. The sidecar includes its drawing.');}
+        try{download(new Blob([JSON.stringify(composition.score)],{type:'application/json'}),`${base}.line-score.json`);trackFiligranaEvent('audio_export_completed',{format:extension,duration:durationBucket(recordingElapsed)});reset();message('Recording and composition saved. The sidecar includes its drawing.');}
         catch(error){reset();message(`Recording saved, but its composition sidecar could not be saved: ${error.message}`);}
       },
       onError:error=>{if(generation!==recordGeneration)return;reset();message(`Could not save recording: ${error.message}`);},
@@ -599,7 +620,7 @@ $('record').onclick=async()=>{
     pendingRecorder=null;recorder=session;recordPreparing=false;recording=true;
     recordingStartedAt=performance.now();recordingElapsed=0;
     // Capture is connected before the first new note and the musical clock start.
-    if(shouldStart)startPlayback();else uiState();message('Recording…');
+    if(shouldStart)startPlayback('audio_export');else uiState();message('Recording…');
   }catch(error){
     session?.cancel();if(generation===recordGeneration){if(shouldStart&&playing)stop();reset();message(`Could not start recording: ${error.message}`);}
   }
@@ -609,6 +630,7 @@ $('record-video').onclick=async()=>{
   if(videoRecording){endVideoRecording();return;}
   if(recordPreparing||recording||recordSaving||videoSaving||busy||!active().length||!canRecordVideo())return;
   const shouldStart=!playing,generation=++videoGeneration;let composition;
+  if(shouldStart)trackFiligranaEvent('listen_requested',{source:'video_recording'});
   videoPreparing=true;videoElapsed=0;uiState();message('Preparing video…');
   try{
     composition=await compositionSnapshot();if(generation!==videoGeneration)return;
@@ -623,7 +645,7 @@ $('record-video').onclick=async()=>{
     if(generation!==videoGeneration){videoCapture.cancel();videoCapture=null;releaseVideoCapture();return;}
     videoPreparing=false;videoRecording=true;videoStartedAt=performance.now();videoElapsed=0;uiState();
     videoLimitTimer=setTimeout(()=>{if(videoRecording){message('Video reached the 10 minute limit. Saving…');endVideoRecording();}},600_000);
-    if(shouldStart)startPlayback();else uiState();message('Recording MP4 video…');
+    if(shouldStart)startPlayback('video_recording');else uiState();message('Recording MP4 video…');
   }catch(error){
     clearTimeout(videoLimitTimer);videoCapture?.cancel();videoCapture=null;releaseVideoCapture();
     if(generation===videoGeneration){videoPreparing=false;videoRecording=false;videoSaving=false;videoStartedAt=0;videoElapsed=0;uiState();draw();message(`Could not start MP4 recording: ${error.message}`);}

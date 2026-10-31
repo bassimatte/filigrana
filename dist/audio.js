@@ -1,6 +1,9 @@
 import {delaySettings} from './instruments.js?v=7';
 import {notePlan,toneCutoff,limiterCurve,roomImpulse} from './synthesis.js?v=6';
 export class Resonator {
+  offlineTime=null;
+  now(){return this.offlineTime??this.ctx?.currentTime??0;}
+  setOfflineTime(time){this.offlineTime=time;}
   async init(context=null) {
     if(this.ctx){if(!this.ctx.startRendering)await this.ctx.resume();return;}
     const Context=context?null:(window.AudioContext||window.webkitAudioContext);if(!context&&!Context)throw new Error('This browser does not support Web Audio.');
@@ -48,21 +51,21 @@ export class Resonator {
 
     this.noise.start();if(!c.startRendering)await c.resume();
   }
-  setVolume(value,playing=true) {if(this.ctx)this.master.gain.setTargetAtTime(playing?value*.8:0,this.ctx.currentTime,.04);}
-  setActiveCount(count){if(this.ctx)this.mix.gain.setTargetAtTime(1/Math.sqrt(Math.max(1,count)),this.ctx.currentTime,.2);}
+  setVolume(value,playing=true) {if(this.ctx)this.master.gain.setTargetAtTime(playing?value*.8:0,this.now(),.04);}
+  setActiveCount(count){if(this.ctx)this.mix.gain.setTargetAtTime(1/Math.sqrt(Math.max(1,count)),this.now(),.2);}
   setTraveller(id,volume,pan){
-    if(!this.ctx)return;const channel=this.channels[id],t=this.ctx.currentTime,v=Math.max(0,Math.min(1,volume)),p=Math.max(-1,Math.min(1,pan));
+    if(!this.ctx)return;const channel=this.channels[id],t=this.now(),v=Math.max(0,Math.min(1,volume)),p=Math.max(-1,Math.min(1,pan));
     for(const gain of [channel.level,channel.noteLevel])if(channel.configured)gain.gain.setTargetAtTime(v,t,.04);else gain.gain.value=v;
     for(const node of [channel.pan,channel.notePan])if(channel.configured)node.pan.setTargetAtTime(p,t,.08);else node.pan.value=p;
     channel.configured=true;
   }
-  setRoom(value){if(this.ctx)this.wet.gain.setTargetAtTime(value*.75,this.ctx.currentTime,.2);}
+  setRoom(value){if(this.ctx)this.wet.gain.setTargetAtTime(value*.75,this.now(),.2);}
   setDelay(time,mix,feedback,enabled=true){
-    if(!this.ctx)return;const s=delaySettings(time,mix,feedback,enabled),t=this.ctx.currentTime;
+    if(!this.ctx)return;const s=delaySettings(time,mix,feedback,enabled),t=this.now();
     this.delay.delayTime.setTargetAtTime(s.time,t,.15);this.delayWet.gain.setTargetAtTime(s.mix,t,.08);this.delayFeedback.gain.setTargetAtTime(s.feedback,t,.08);this.delaySend.gain.setTargetAtTime(s.send,t,.08);
   }
   strike(hz,ring,pan=0,bend=0,travellerId=0,instrumentKey='bell'){
-    if(!this.ctx||!Number.isFinite(hz)||hz<=0)return false;const c=this.ctx,t=c.currentTime;
+    if(!this.ctx||!Number.isFinite(hz)||hz<=0)return false;const c=this.ctx,t=this.now();
     const channel=this.channels[travellerId];
     // Independent gates allow three simultaneous notes, one per traveller.
     if(t-channel.lastStrike<.75)return false;channel.lastStrike=t;
@@ -115,24 +118,24 @@ export class Resonator {
     lastOscillator.onended=()=>{voice.released=true;for(const o of [...voice.oscillators,...voice.modulators])o.disconnect();for(const g of voice.gains)g.disconnect();for(const node of voice.nodes)node.disconnect();voice.filter.disconnect();voice.envelope.disconnect();voice.pan.disconnect();this.voices=this.voices.filter(v=>v!==voice);};
     return true;
   }
-  colour(bend,travellerId=0){const v=this.channels?.[travellerId]?.currentVoice;if(this.ctx&&v&&!v.released){const t=this.ctx.currentTime;v.filter.frequency.cancelScheduledValues(t);v.filter.frequency.setTargetAtTime(toneCutoff(v.hz,v.brightness,t-v.started,v.tail,bend),t,.25);}}
+  colour(bend,travellerId=0){const v=this.channels?.[travellerId]?.currentVoice;if(this.ctx&&v&&!v.released){const t=this.now();v.filter.frequency.cancelScheduledValues(t);v.filter.frequency.setTargetAtTime(toneCutoff(v.hz,v.brightness,t-v.started,v.tail,bend),t,.25);}}
   releaseVoice(voice,fade=.15){
-    if(voice.released)return;voice.released=true;const t=this.ctx.currentTime,current=voice.envelope.gain.value;
+    if(voice.released)return;voice.released=true;const t=this.now(),current=voice.envelope.gain.value;
     voice.envelope.gain.cancelScheduledValues(t);voice.envelope.gain.setValueAtTime(current,t);voice.envelope.gain.linearRampToValueAtTime(0,t+fade);
     for(const o of [...voice.oscillators,...voice.modulators])o.stop(t+fade);
   }
   tune(hz,q,travellerId=0) {
     if(!this.ctx)return;
-    for(const {filter,ratio}of this.channels[travellerId].filters){filter.frequency.setTargetAtTime(Math.min(this.ctx.sampleRate*.42,hz*ratio),this.ctx.currentTime,.07);filter.Q.setTargetAtTime(q,this.ctx.currentTime,.05);}
+    for(const {filter,ratio}of this.channels[travellerId].filters){filter.frequency.setTargetAtTime(Math.min(this.ctx.sampleRate*.42,hz*ratio),this.now(),.07);filter.Q.setTargetAtTime(q,this.now(),.05);}
   }
   exciteEdge(mode,duration,travellerId=0) {
-    if(!this.ctx)return;const t=this.ctx.currentTime,g=this.channels[travellerId].excite.gain;
+    if(!this.ctx)return;const t=this.now(),g=this.channels[travellerId].excite.gain;
     const current=g.value;g.cancelScheduledValues(t);g.setValueAtTime(current,t);
     if(mode==='pluck'){g.linearRampToValueAtTime(.85,t+.014);g.exponentialRampToValueAtTime(.0001,t+Math.min(1.3,Math.max(.08,duration*.8)));}
     else g.setTargetAtTime(.42,t,.08);
   }
   silenceChannel(travellerId){
-    if(!this.ctx)return;const t=this.ctx.currentTime,channel=this.channels[travellerId];
+    if(!this.ctx)return;const t=this.now(),channel=this.channels[travellerId];
     channel.excite.gain.cancelScheduledValues(t);channel.excite.gain.setTargetAtTime(0,t,.02);
     for(const v of this.voices)if(v.travellerId===travellerId)this.releaseVoice(v);channel.currentVoice=null;
   }

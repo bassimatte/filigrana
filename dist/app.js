@@ -10,7 +10,7 @@ import {bellPitch,bellDecay,curvature,noteName,tunePitch,SCALES} from './music.j
 import {Traveller,defaultStarts} from './traveller.js?v=3';
 import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=7';
 import {Conversation,pieceEnvelope} from './performance.js?v=2';
-import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=14';
+import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=15';
 const icon=name=>`<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-${name}"/></svg>`;
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 let audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i)),conversation=new Conversation();
@@ -45,6 +45,7 @@ let recorder=null,pendingRecorder=null,recordPreparing=false,recordSaving=false,
 let videoCapture=null,videoDestination=null,videoExportCanvas=null,videoExportContext=null,videoPreparing=false,videoRecording=false,videoSaving=false,videoGeneration=0,videoStartedAt=0,videoElapsed=0,offlineRender=false,offlineRenderCancel=false,offlineRenderProgress=0;
 try{const saved=localStorage.getItem('filigrana-recording-format');if(['mp3','wav'].includes(saved))$('record-format').value=saved;}catch{}
 try{const saved=localStorage.getItem('filigrana-video-frame');if(['landscape','square','portrait'].includes(saved))$('video-frame').value=saved;}catch{}
+try{const saved=localStorage.getItem('filigrana-render-duration');if(['60','120','300','600'].includes(saved))$('render-duration').value=saved;}catch{}
 function recordingInfo(){
   const rate=(Math.min($('record-format').value==='mp3'?48000:192000,audio.ctx?.sampleRate||48000)/1000).toLocaleString('en-US',{maximumFractionDigits:1});
   $('record-format-info').textContent=canRecord()?`${$('record-format').value==='wav'?'24-bit': '320 kbps'} · ${rate} kHz · stereo`:'Recording is unavailable in this browser.';
@@ -52,6 +53,7 @@ function recordingInfo(){
 }
 $('record-format').onchange=()=>{try{localStorage.setItem('filigrana-recording-format',$('record-format').value);}catch{}recordingInfo();};
 $('video-frame').onchange=()=>{try{localStorage.setItem('filigrana-video-frame',$('video-frame').value);}catch{}};
+$('render-duration').onchange=()=>{try{localStorage.setItem('filigrana-render-duration',$('render-duration').value);}catch{}};
 const recordingMenu=$('record-settings');
 document.addEventListener('click',event=>{if(!recordingMenu.contains(event.target))recordingMenu.removeAttribute('open');});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&recordingMenu.hasAttribute('open')){recordingMenu.removeAttribute('open');recordingMenu.querySelector('summary').focus();}});
@@ -147,7 +149,7 @@ function uiState(){
   $('play').disabled=busy||!active().length||videoPreparing&&!playing;$('reset').disabled=busy||videoPreparing||!travellers.some(t=>t.origin);$('reset').hidden=recording||recordSaving||videoRecording||videoSaving;$('record').disabled=recordPreparing||recordSaving||videoPreparing||videoRecording||videoSaving||busy||!active().length||!canRecord();
   $('record-label').textContent=recordPreparing?'Preparing…':recordSaving?'Saving…':recording?'Save recording':'Record';$('record-icon').innerHTML=icon(recordPreparing||recordSaving?'loader':recording?'stop':'record');$('record').setAttribute('aria-pressed',String(recording));$('record').setAttribute('aria-busy',String(recordPreparing||recordSaving));$('record-indicator').hidden=!(recording||videoRecording);$('recording-monitor').hidden=!(recording||recordSaving||videoRecording||videoSaving);recordingInfo();$('record').classList.toggle('recording',recording);$('record').classList.toggle('busy',recordPreparing||recordSaving);
   $('record-video').disabled=offlineRender||recordPreparing||recording||recordSaving||videoSaving||busy||!active().length||!canRecordVideo();$('video-record-label').textContent=videoPreparing?'Preparing…':videoRecording?'Stop':videoSaving?'Saving…':'Video';$('record-video').setAttribute('aria-label',videoPreparing?'Cancel MP4 preparation':videoRecording?'Stop MP4 recording':videoSaving?'Saving MP4':'Record MP4 video');$('record-video').title=canRecordVideo()?'Record an H.264 MP4 with AAC audio':'MP4 video encoding requires WebCodecs H.264 support in this browser';$('record-video').setAttribute('aria-pressed',String(videoRecording));$('record-video').setAttribute('aria-busy',String(videoPreparing||videoSaving));$('record-video').classList.toggle('recording',videoRecording);$('record-video').classList.toggle('busy',videoPreparing||videoSaving);
-  $('render-video').disabled=(!offlineRender&&(+$('duration').value===0||!active().length||busy||!canRecordVideo()))||recordPreparing||recording||recordSaving||videoPreparing||videoRecording||videoSaving;
+  $('render-video').disabled=(!offlineRender&&(!active().length||busy||!canRecordVideo()))||recordPreparing||recording||recordSaving||videoPreparing||videoRecording||videoSaving;
   $('render-video-label').textContent=offlineRender?offlineRenderCancel?'Cancelling…':`Render ${offlineRenderProgress}%`:'Render';$('render-video').setAttribute('aria-label',offlineRender?'Cancel offline render':'Render MP4 without real-time playback');$('render-video').setAttribute('aria-busy',String(offlineRender));
   $('video-frame').disabled=videoPreparing||videoRecording||videoSaving;
   $('save-score').disabled=busy||!image||!graph?.edges.length;
@@ -503,8 +505,7 @@ async function endVideoRecording(){
 }
 async function renderMp4Offline(){
   if(offlineRender){offlineRenderCancel=true;$('render-video-label').textContent='Cancelling…';return;}
-  const duration=+$('duration').value;
-  if(!duration){message('Choose a finite piece length in Settings → Journey before rendering.');return;}
+  const duration=+$('render-duration').value,originalPieceLength=$('duration').value;
   if(recordPreparing||recording||recordSaving||videoPreparing||videoRecording||videoSaving||busy||!active().length||!canRecordVideo())return;
   const buttonStates=[...document.querySelectorAll('button,input,select')].filter(element=>element.id!=='render-video').map(element=>[element,element.disabled]);
   const previous={audio,travellers,conversation,playing,totalTime,finished,lastSpeaker};
@@ -514,6 +515,7 @@ async function renderMp4Offline(){
   for(const [element]of buttonStates)element.disabled=true;
   $('render-video').disabled=false;message('Preparing offline render…');
   try{
+    $('duration').value=String(duration);
     composition=await compositionSnapshot();
     const renderTravellers=previous.travellers.map(source=>{
       const t=new Traveller(source.id);t.setGraph(graph);
@@ -560,7 +562,7 @@ async function renderMp4Offline(){
     else message(`Could not render MP4: ${error.message}`);
   }finally{
     if(exporter)await exporter.cancel();
-    renderVisualTime=null;offlineRender=false;offlineRenderCancel=false;offlineRenderProgress=0;
+    renderVisualTime=null;offlineRender=false;offlineRenderCancel=false;offlineRenderProgress=0;$('duration').value=originalPieceLength;
     audio=previous.audio;travellers=previous.travellers;conversation=previous.conversation;totalTime=previous.totalTime;finished=previous.finished;lastSpeaker=previous.lastSpeaker;playing=false;
     releaseVideoCapture();
     for(const [element,disabled]of buttonStates)element.disabled=disabled;

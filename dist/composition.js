@@ -10,7 +10,7 @@ export function validateComposition(input){
   const controls={};for(const [key,[min,max,fallback]]of Object.entries(CONTROL_LIMITS))controls[key]=number(input.controls?.[key],min,max,fallback);
   controls.branch=['flow','explore','random'].includes(input.controls?.branch)?input.controls.branch:'flow';
   controls.interaction=input.controls?.interaction==='conversation'?'conversation':'independent';
-  controls.duration=[0,120,300,600].includes(input.controls?.duration)?input.controls.duration:0;
+  controls.duration=[0,60,120,300,600].includes(input.controls?.duration)?input.controls.duration:0;
   controls['delay-enabled']=input.controls?.['delay-enabled']!==false;
   controls.seed=typeof input.controls?.seed==='string'?input.controls.seed.slice(0,80):'ink-01';
   return {format:'line-resonator',version:1,image:{src:input.image.src,name:String(input.image.name||'Saved drawing').slice(0,160)},videoFrame:['landscape','square','portrait'].includes(input.videoFrame)?input.videoFrame:'landscape',controls,

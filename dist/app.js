@@ -498,8 +498,10 @@ function releaseVideoCapture(){
   videoDestination=null;videoExportCanvas=null;videoExportContext=null;
 }
 function renderVideoFrame(){
-  if(!videoExportContext)return;const width=videoExportCanvas.width,height=videoExportCanvas.height,sourceWidth=canvas.width,sourceHeight=canvas.height,scale=Math.min(width/sourceWidth,height/sourceHeight)*.94,drawWidth=sourceWidth*scale,drawHeight=sourceHeight*scale;
-  videoExportContext.fillStyle=palette.paper;videoExportContext.fillRect(0,0,width,height);videoExportContext.drawImage(canvas,(width-drawWidth)/2,(height-drawHeight)/2,drawWidth,drawHeight);
+  if(!videoExportContext)return;const width=videoExportCanvas.width,height=videoExportCanvas.height,sourceWidth=canvas.width,sourceHeight=canvas.height,ratioX=sourceWidth/view.width,ratioY=sourceHeight/view.height;
+  const imageX=view.x*ratioX,imageY=view.y*ratioY,imageWidth=drawingWidth*view.scale*ratioX,imageHeight=drawingHeight*view.scale*ratioY,marginX=imageWidth*.015,marginY=imageHeight*.015;
+  const cropX=imageX-marginX,cropY=imageY-marginY,cropWidth=imageWidth+marginX*2,cropHeight=imageHeight+marginY*2,scale=Math.min(width/cropWidth,height/cropHeight),drawWidth=cropWidth*scale,drawHeight=cropHeight*scale;
+  videoExportContext.fillStyle=palette.paper;videoExportContext.fillRect(0,0,width,height);videoExportContext.drawImage(canvas,cropX,cropY,cropWidth,cropHeight,(width-drawWidth)/2,(height-drawHeight)/2,drawWidth,drawHeight);
 }
 function cancelVideoPreparation(){videoGeneration++;clearTimeout(videoLimitTimer);videoCapture?.cancel();videoCapture=null;videoPreparing=false;videoElapsed=0;releaseVideoCapture();uiState();draw();message();}
 async function endVideoRecording(){

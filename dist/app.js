@@ -11,7 +11,8 @@ import {Traveller,defaultStarts} from './traveller.js?v=3';
 import {INSTRUMENTS,instrument,isNoteVoice} from './instruments.js?v=7';
 import {Conversation,pieceEnvelope} from './performance.js?v=2';
 import {CONTROL_LIMITS,numericSeed,validateComposition} from './composition.js?v=15';
-import {trackFiligranaEvent} from './analytics.js?v=1';
+import {trackFiligranaEvent} from './analytics.js?v=2';
+import {encodeOfflineAudioBuffer} from './offline-audio-export.js?v=1';
 const icon=name=>`<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#icon-${name}"/></svg>`;
 const $=id=>document.getElementById(id),canvas=$('drawing'),ctx=canvas.getContext('2d'),scope=$('scope'),sx=scope.getContext('2d');
 let audio=new Resonator(),travellers=Array.from({length:3},(_,i)=>new Traveller(i)),conversation=new Conversation();
@@ -45,10 +46,11 @@ function applyVisualMode(){ hoverVoice=null;$('canvas-wrap').classList.toggle('l
 applyVisualMode();
  $('visual-mode').onchange=()=>{visualMode=$('visual-mode').value;try{localStorage.setItem('filigrana-visual-mode',visualMode);}catch{}trackFiligranaEvent('visualization_selected',{mode:visualMode});applyVisualMode();};
 let recorder=null,pendingRecorder=null,recordPreparing=false,recordSaving=false,recordGeneration=0,recordingStartedAt=0,recordingElapsed=0;
-let videoCapture=null,videoDestination=null,videoExportCanvas=null,videoExportContext=null,videoPreparing=false,videoRecording=false,videoSaving=false,videoGeneration=0,videoStartedAt=0,videoElapsed=0,offlineRender=false,offlineRenderCancel=false,offlineRenderProgress=0;
+let videoCapture=null,videoDestination=null,videoExportCanvas=null,videoExportContext=null,videoPreparing=false,videoRecording=false,videoSaving=false,videoGeneration=0,videoStartedAt=0,videoElapsed=0,offlineRender=false,offlineRenderCancel=false,offlineRenderProgress=0,offlineRenderAbort=null;
 try{const saved=localStorage.getItem('filigrana-recording-format');if(['mp3','wav'].includes(saved))$('record-format').value=saved;}catch{}
 try{const saved=localStorage.getItem('filigrana-video-frame');if(['landscape','square','portrait'].includes(saved))$('video-frame').value=saved;}catch{}
 try{const saved=localStorage.getItem('filigrana-render-duration');if(['60','120','300','600'].includes(saved))$('render-duration').value=saved;}catch{}
+try{const saved=localStorage.getItem('filigrana-render-format');if(['mp4','mp3','wav'].includes(saved))$('render-format').value=saved;}catch{}
 function recordingInfo(){
   const rate=(Math.min($('record-format').value==='mp3'?48000:192000,audio.ctx?.sampleRate||48000)/1000).toLocaleString('en-US',{maximumFractionDigits:1});
   $('record-format-info').textContent=canRecord()?`${$('record-format').value==='wav'?'24-bit': '320 kbps'} · ${rate} kHz · stereo`:'Recording is unavailable in this browser.';
@@ -57,6 +59,7 @@ function recordingInfo(){
 $('record-format').onchange=()=>{try{localStorage.setItem('filigrana-recording-format',$('record-format').value);}catch{}recordingInfo();};
 $('video-frame').onchange=()=>{try{localStorage.setItem('filigrana-video-frame',$('video-frame').value);}catch{}};
 $('render-duration').onchange=()=>{try{localStorage.setItem('filigrana-render-duration',$('render-duration').value);}catch{}};
+$('render-format').onchange=()=>{try{localStorage.setItem('filigrana-render-format',$('render-format').value);}catch{}uiState();};
 const recordingMenu=$('record-settings');
 document.addEventListener('click',event=>{if(!recordingMenu.contains(event.target))recordingMenu.removeAttribute('open');});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&recordingMenu.hasAttribute('open')){recordingMenu.removeAttribute('open');recordingMenu.querySelector('summary').focus();}});
@@ -161,8 +164,9 @@ function uiState(){
   $('play').disabled=busy||!active().length||videoPreparing&&!playing;$('reset').disabled=busy||videoPreparing||!travellers.some(t=>t.origin);$('reset').hidden=recording||recordSaving||videoRecording||videoSaving;$('record').disabled=recordPreparing||recordSaving||videoPreparing||videoRecording||videoSaving||busy||!active().length||!canRecord();
   $('record-label').textContent=recordPreparing?'Preparing…':recordSaving?'Saving…':recording?'Save recording':'Record';$('record-icon').innerHTML=icon(recordPreparing||recordSaving?'loader':recording?'stop':'record');$('record').setAttribute('aria-pressed',String(recording));$('record').setAttribute('aria-busy',String(recordPreparing||recordSaving));$('record-indicator').hidden=!(recording||videoRecording);$('recording-monitor').hidden=!(recording||recordSaving||videoRecording||videoSaving);recordingInfo();$('record').classList.toggle('recording',recording);$('record').classList.toggle('busy',recordPreparing||recordSaving);
   $('record-video').disabled=offlineRender||recordPreparing||recording||recordSaving||videoSaving||busy||!active().length||!canRecordVideo();$('video-record-label').textContent=videoPreparing?'Preparing…':videoRecording?'Stop':videoSaving?'Saving…':'Video';$('record-video').setAttribute('aria-label',videoPreparing?'Cancel MP4 preparation':videoRecording?'Stop MP4 recording':videoSaving?'Saving MP4':'Record MP4 video');$('record-video').title=canRecordVideo()?'Record an H.264 MP4 with AAC audio':'MP4 video encoding requires WebCodecs H.264 support in this browser';$('record-video').setAttribute('aria-pressed',String(videoRecording));$('record-video').setAttribute('aria-busy',String(videoPreparing||videoSaving));$('record-video').classList.toggle('recording',videoRecording);$('record-video').classList.toggle('busy',videoPreparing||videoSaving);
-  $('render-video').disabled=(!offlineRender&&(!active().length||busy||!canRecordVideo()))||recordPreparing||recording||recordSaving||videoPreparing||videoRecording||videoSaving;
-  $('render-video-label').textContent=offlineRender?offlineRenderCancel?'Cancelling…':`Render ${offlineRenderProgress}%`:'Render';$('render-video').setAttribute('aria-label',offlineRender?'Cancel offline render':'Render MP4 without real-time playback');$('render-video').setAttribute('aria-busy',String(offlineRender));
+  const selectedRenderFormat=$('render-format').value,renderAvailable=selectedRenderFormat==='mp4'?canRecordVideo():canRenderAudio();
+  $('render-video').disabled=(!offlineRender&&(!active().length||busy||!renderAvailable))||recordPreparing||recording||recordSaving||videoPreparing||videoRecording||videoSaving;
+  $('render-video-label').textContent=offlineRender?offlineRenderCancel?'Cancelling…':`Render ${offlineRenderProgress}%`:'Render';$('render-video').setAttribute('aria-label',offlineRender?'Cancel offline render':`Render ${selectedRenderFormat==='mp4'?'video':'audio'} without real-time playback`);$('render-video').title=selectedRenderFormat==='mp4'?'Render an H.264 MP4 with AAC audio':selectedRenderFormat==='wav'?'Render a 24-bit WAV audio file':'Render a 320 kbps MP3 audio file';$('render-video').setAttribute('aria-busy',String(offlineRender));
   $('video-frame').disabled=videoPreparing||videoRecording||videoSaving;
   $('save-score').disabled=busy||!image||!graph?.edges.length;
   for(const t of travellers){
@@ -442,8 +446,9 @@ $('load-score-trigger').onclick=()=>$('load-score').click();
 document.querySelectorAll('.control-group').forEach(group=>group.addEventListener('toggle',()=>{
   if(group.open)document.querySelectorAll('.control-group[open]').forEach(other=>{if(other!==group)other.open=false;});
 }));
-document.addEventListener('input',event=>{if(event.target.id!=='preset'&&event.target.matches('input[type=range],select'))customMood();});
-document.addEventListener('change',event=>{if(event.target.id!=='preset'&&event.target.matches('select,#delay-enabled'))customMood();});
+const nonMoodControls=new Set(['preset','record-format','render-format','render-duration','video-frame']);
+document.addEventListener('input',event=>{if(!nonMoodControls.has(event.target.id)&&event.target.matches('input[type=range],select'))customMood();});
+document.addEventListener('change',event=>{if(!nonMoodControls.has(event.target.id)&&event.target.matches('select,#delay-enabled'))customMood();});
 $('analyse').onclick=analyse;
 $('suggest-sensitivity').onclick=()=>{const value=Number($('suggest-sensitivity').dataset.value);if(!Number.isFinite(value))return;$('sensitivity').value=String(value);$('sensitivity-value').textContent=String(value);paintRange($('sensitivity'));analyse();};
 $('cleanup').onchange=()=>previewSensitivity(+$('sensitivity').value);
@@ -498,6 +503,7 @@ $('load-score').onchange=async event=>{
 function cancelRecordingPreparation(){recordGeneration++;pendingRecorder?.cancel();pendingRecorder=null;recordPreparing=false;message();}
 function endRecording(){if(!recording)return;recordingElapsed+=(performance.now()-recordingStartedAt)/1000;recordingStartedAt=0;recording=false;recordSaving=true;uiState();message('Saving recording…');recorder.stop();}
 function canRecordVideo(){const Context=window.AudioContext||window.webkitAudioContext;return typeof VideoEncoder!=='undefined'&&typeof MediaStream!=='undefined'&&!!Context&&typeof Context.prototype.createMediaStreamDestination==='function';}
+function canRenderAudio(){return typeof Worker!=='undefined'&&Boolean(window.OfflineAudioContext||window.webkitOfflineAudioContext);}
 function releaseVideoCapture(){
   if(videoDestination&&audio.master)try{audio.master.disconnect(videoDestination);}catch{}
   for(const track of videoDestination?.stream.getTracks()||[])track.stop();
@@ -522,13 +528,15 @@ async function endVideoRecording(){
   }
 }
 async function renderMp4Offline(){
-  if(offlineRender){offlineRenderCancel=true;$('render-video-label').textContent='Cancelling…';return;}
+  if(offlineRender){offlineRenderCancel=true;offlineRenderAbort?.abort();$('render-video-label').textContent='Cancelling…';return;}
+  const renderFormat=$('render-format').value;
   const duration=+$('render-duration').value,originalPieceLength=$('duration').value;
-  if(recordPreparing||recording||recordSaving||videoPreparing||videoRecording||videoSaving||busy||!active().length||!canRecordVideo())return;
-  trackFiligranaEvent('render_started',{duration:durationBucket(duration)});
+  if(recordPreparing||recording||recordSaving||videoPreparing||videoRecording||videoSaving||busy||!active().length||(renderFormat==='mp4'?!canRecordVideo():!canRenderAudio()))return;
+  trackFiligranaEvent('render_started',{duration:durationBucket(duration),format:renderFormat});
   const buttonStates=[...document.querySelectorAll('button,input,select')].filter(element=>element.id!=='render-video').map(element=>[element,element.disabled]);
   const previous={audio,travellers,conversation,playing,totalTime,finished,lastSpeaker};
-  let renderAudio=null,renderContext=null,exporter=null,composition=null;
+  let renderAudio=null,renderContext=null,exporter=null,composition=null,renderExtension=renderFormat;
+  offlineRenderAbort=new AbortController();
   if(previous.playing){playbackClock.stop();clearListenMilestones();previous.audio.silence();}
   offlineRender=true;offlineRenderCancel=false;offlineRenderProgress=0;playing=false;uiState();
   for(const [element]of buttonStates)element.disabled=true;
@@ -545,44 +553,49 @@ async function renderMp4Offline(){
     travellers=renderTravellers;audio=renderAudio=new Resonator();conversation=new Conversation();threadLights.clear();totalTime=0;finished=false;lastSpeaker=null;
     renderAudio.setOfflineTime(0);
     const frameRate=30,tailSeconds=6,renderSeconds=duration+tailSeconds,sampleRate=48000;
-    renderContext=new OfflineAudioContext(2,Math.ceil(renderSeconds*sampleRate),sampleRate);
+    const OfflineContext=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+    renderContext=new OfflineContext(2,Math.ceil(renderSeconds*sampleRate),sampleRate);
     await renderAudio.init(renderContext);updateEffects();renderAudio.setActiveCount(active().length);
     for(const t of active())renderAudio.setTraveller(t.id,t.volume,t.pan);
     const s=settings();renderAudio.setVolume(s.volume*pieceEnvelope(0,s.duration).gain);
     playing=true;
     for(const t of active()){t.phrasing.reset();soundEdge(t);}answer();
     draw();
-    const dimensions={landscape:[1920,1080],square:[1080,1080],portrait:[1080,1920]}[$('video-frame').value]||[1920,1080];
-    videoExportCanvas=document.createElement('canvas');[videoExportCanvas.width,videoExportCanvas.height]=dimensions;videoExportContext=videoExportCanvas.getContext('2d');
-    const {createOfflineMp4Export}=await import('./video-export.js?v=2');
-    exporter=await createOfflineMp4Export({canvas:videoExportCanvas,width:dimensions[0],height:dimensions[1]});
+    if(renderFormat==='mp4'){
+      const dimensions={landscape:[1920,1080],square:[1080,1080],portrait:[1080,1920]}[$('video-frame').value]||[1920,1080];
+      videoExportCanvas=document.createElement('canvas');[videoExportCanvas.width,videoExportCanvas.height]=dimensions;videoExportContext=videoExportCanvas.getContext('2d');
+      const {createOfflineMp4Export}=await import('./video-export.js?v=2');
+      exporter=await createOfflineMp4Export({canvas:videoExportCanvas,width:dimensions[0],height:dimensions[1]});
+    }
     if(offlineRenderCancel)throw new DOMException('Render cancelled.','AbortError');
     const frameCount=Math.ceil(renderSeconds*frameRate);
     for(let frame=0;frame<frameCount;frame++){
       if(offlineRenderCancel)throw new DOMException('Render cancelled.','AbortError');
       const time=frame/frameRate;
       if(playing)advanceMusic(time-totalTime);else renderAudio.setOfflineTime(time);
-      renderVisualTime=time;draw();renderVideoFrame();
-      await exporter.addFrame(time,1/frameRate);
+      renderVisualTime=time;
+      if(renderFormat==='mp4'){draw();renderVideoFrame();await exporter.addFrame(time,1/frameRate);}
       const progress=Math.min(99,Math.floor((frame+1)/frameCount*100));
       if(progress!==offlineRenderProgress){offlineRenderProgress=progress;$('render-video-label').textContent=`Render ${progress}%`;}
       if(frame%30===29)await new Promise(resolve=>setTimeout(resolve,0));
     }
     renderAudio.setOfflineTime(duration+tailSeconds);renderAudio.silence();playing=false;
-    message('Finishing audio and MP4…');$('render-video-label').textContent='Render audio…';
+    message(renderFormat==='mp4'?'Finishing audio and MP4…':'Encoding rendered audio…');$('render-video-label').textContent=renderFormat==='mp4'?'Render audio…':'Encoding…';
     const audioBuffer=await renderContext.startRendering();
     if(offlineRenderCancel)throw new DOMException('Render cancelled.','AbortError');
-    const blob=await exporter.finish(audioBuffer);exporter=null;
+    let blob;
+    if(renderFormat==='mp4'){blob=await exporter.finish(audioBuffer);exporter=null;}
+    else{const encoded=await encodeOfflineAudioBuffer(audioBuffer,renderFormat,progress=>{$('render-video-label').textContent=`Encode ${Math.floor(progress*100)}%`;},offlineRenderAbort.signal);blob=encoded.blob;renderExtension=encoded.extension;}
     const base=`filigrana-${new Date().toISOString().slice(0,19).replaceAll(':','-')}`;
-    download(blob,`${base}.mp4`);download(new Blob([JSON.stringify(composition.score)],{type:'application/json'}),`${base}.line-score.json`);
-    trackFiligranaEvent('render_completed',{duration:durationBucket(duration)});
-    message('MP4 render and composition saved. The sidecar includes its drawing.');
+    download(blob,`${base}.${renderExtension}`);download(new Blob([JSON.stringify(composition.score)],{type:'application/json'}),`${base}.line-score.json`);
+    trackFiligranaEvent('render_completed',{duration:durationBucket(duration),format:renderFormat});
+    message(`Rendered ${renderFormat==='mp4'?'video':'audio'} and composition saved. The sidecar includes its drawing.`);
   }catch(error){
     if(error.name==='AbortError')message('Render cancelled.');
-    else{trackFiligranaEvent('render_failed',{reason:/cannot encode|unavailable|unsupported/i.test(error.message)?'unsupported':error.name==='EncodingError'?'encoding':'unknown',duration:durationBucket(duration)});message(`Could not render MP4: ${error.message}`);}
+    else{trackFiligranaEvent('render_failed',{reason:/cannot encode|unavailable|unsupported/i.test(error.message)?'unsupported':error.name==='EncodingError'?'encoding':'unknown',duration:durationBucket(duration),format:renderFormat});message(`Could not render media: ${error.message}`);}
   }finally{
     if(exporter)await exporter.cancel();
-    renderVisualTime=null;offlineRender=false;offlineRenderCancel=false;offlineRenderProgress=0;$('duration').value=originalPieceLength;
+    renderVisualTime=null;offlineRender=false;offlineRenderCancel=false;offlineRenderProgress=0;offlineRenderAbort=null;$('duration').value=originalPieceLength;
     audio=previous.audio;travellers=previous.travellers;conversation=previous.conversation;totalTime=previous.totalTime;finished=previous.finished;lastSpeaker=previous.lastSpeaker;playing=false;
     releaseVideoCapture();
     for(const [element,disabled]of buttonStates)element.disabled=disabled;

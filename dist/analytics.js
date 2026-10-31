@@ -16,9 +16,9 @@ const SCHEMA=Object.freeze({
   visualization_selected:{mode:['threads','trace','afterimage','halos','waves','dew','mist']},
   audio_export_completed:{format:['mp3','wav'],duration:['short','medium','long']},
   video_recording_completed:{duration:['short','medium','long']},
-  render_started:{duration:['short','medium','long']},
-  render_completed:{duration:['short','medium','long']},
-  render_failed:{reason:['unsupported','encoding','unknown'],duration:['short','medium','long']},
+  render_started:{duration:['short','medium','long'],format:['mp3','wav','mp4']},
+  render_completed:{duration:['short','medium','long'],format:['mp3','wav','mp4']},
+  render_failed:{reason:['unsupported','encoding','unknown'],duration:['short','medium','long'],format:['mp3','wav','mp4']},
   composition_action:{action:['saved','loaded']}
 });
 const pending=[];
